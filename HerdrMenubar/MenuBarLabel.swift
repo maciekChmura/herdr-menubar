@@ -1,14 +1,29 @@
+/// How the menu bar item summarizes the agents. The user picks it in the menu.
+enum MenuBarStyle: String, CaseIterable {
+    /// One count per state, such as "🔴1 🟢2 🔵3 ⚪1".
+    case counts
+    /// One dot per agent, in herdr's order, such as "🟢🔴🟢".
+    case dots
+
+    var title: String {
+        switch self {
+        case .counts: "Counts per state"
+        case .dots: "One dot per agent"
+        }
+    }
+}
+
 /// What the menu bar item shows. See "Menu bar label" in `docs/PRD.md`.
 enum MenuBarLabel: Equatable {
-    /// Per-state counts, such as "🔴1 🟢2 ✅3 ⚪1".
-    case counts(String)
+    /// Counts or dots, made of state glyphs.
+    case text(String)
     /// An SF Symbol name.
     case symbol(String)
 
     static let noAgentsSymbol = "circle.dashed"
     static let unreachableSymbol = "exclamationmark.circle"
 
-    init(_ state: AgentStore.State) {
+    init(_ state: AgentStore.State, style: MenuBarStyle) {
         switch state {
         case .loading:
             self = .symbol(Self.noAgentsSymbol)
@@ -17,7 +32,10 @@ enum MenuBarLabel: Equatable {
         case .loaded(let agents) where agents.isEmpty:
             self = .symbol(Self.noAgentsSymbol)
         case .loaded(let agents):
-            self = .counts(Self.counts(of: agents))
+            switch style {
+            case .counts: self = .text(Self.counts(of: agents))
+            case .dots: self = .text(Self.dots(of: agents))
+            }
         }
     }
 
@@ -30,6 +48,12 @@ enum MenuBarLabel: Equatable {
             }
             .joined(separator: " ")
     }
+
+    /// One glyph per agent, in the order herdr lists them, so each agent keeps its place
+    /// and only its color changes.
+    static func dots(of agents: [Agent]) -> String {
+        agents.map(\.agentStatus.glyph).joined()
+    }
 }
 
 extension AgentStatus {
@@ -37,9 +61,9 @@ extension AgentStatus {
         switch self {
         case .blocked: "🔴"
         case .working: "🟢"
-        case .done: "✅"
+        case .done: "🔵"
         case .idle: "⚪"
-        case .unknown: "❔"
+        case .unknown: "⚫"
         }
     }
 }

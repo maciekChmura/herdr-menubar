@@ -41,7 +41,16 @@ done
 echo "Installing to ${DEST}…"
 rm -rf "$DEST"
 ditto "$BUILT" "$DEST"
-open "$DEST"
+
+# LaunchServices sometimes refuses to open an app right after its previous copy quit (error -600), so retry.
+for attempt in 1 2 3; do
+    open "$DEST" && break
+    if [[ $attempt == 3 ]]; then
+        echo "Couldn't launch ${DEST}. Open it from Finder." >&2
+        exit 1
+    fi
+    sleep 1
+done
 
 echo "Done: $DEST is installed and running."
 echo "To start it at login, open its menu and turn on \"Launch at login\"."

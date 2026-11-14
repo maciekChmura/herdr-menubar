@@ -16,7 +16,7 @@ A native macOS menu bar app that shows the live state of the AI coding agents ru
 - No starting or stopping agents, and no managing workspaces, tabs or panes.
 - No changes to herdr's configuration, and no replacing herdr's own notifications.
 - No App Store, sandboxing or auto-update.
-- No settings window. The only setting is the "Launch at login" toggle in the menu.
+- No settings window. The only settings are in the menu: what the menu bar shows, and "Launch at login".
 
 ## User
 
@@ -49,17 +49,25 @@ If milestone M2 finds that `pane.updated` fires too often to be useful, drop it 
 | --- | --- | --- |
 | `blocked` | herdr recognized an approval or question prompt. The agent is waiting for the user. | 🔴 |
 | `working` | The agent is busy. | 🟢 |
-| `done` | The agent finished and hasn't been seen yet. It turns `idle` once it's focused through herdr. | ✅ |
+| `done` | The agent finished and hasn't been seen yet. It turns `idle` once it's focused through herdr. | 🔵 |
 | `idle` | The agent is ready for input and has already been seen. | ⚪ |
-| `unknown` | An agent is present, but herdr can't classify its state. | ❔ |
+| `unknown` | An agent is present, but herdr can't classify its state. | ⚫ |
 
 Any status string this app doesn't recognize is treated as `unknown`, so a newer herdr can't break decoding.
 
-This order (blocked, working, done, idle, unknown) is used everywhere: in the menu bar label and when sorting the dropdown.
+Every glyph is a dot, so the same legend works for counts and for one dot per agent.
+
+This order (blocked, working, done, idle, unknown) is used for the counts in the menu bar and for sorting the dropdown.
 
 ## Menu bar label
 
-- Show one count for each state, in the order above, with zero counts left out. Example: `🔴1 🟢2 ✅3 ⚪1`.
+The user picks one of two styles under "Menu bar shows" in the menu. The choice is remembered across launches.
+
+- **Counts per state** (the default): one count for each state, in the order above, with zero counts left out. Example: `🔴1 🟢2 🔵3 ⚪1`.
+- **One dot per agent**: one glyph per agent, in the order herdr lists the agents. Each agent keeps its place, and only its color changes when its state changes. Example: `🟢🔴🟢🔵⚪`.
+
+In both styles:
+
 - With no agents, show the SF Symbol `circle.dashed`.
 - When the herdr server isn't reachable, show the SF Symbol `exclamationmark.circle`.
 
@@ -74,7 +82,7 @@ Use `MenuBarExtra` with `.menuBarExtraStyle(.menu)`, which gives the standard na
    - the folder: the last path component of `foreground_cwd`, falling back to `cwd`.
 
    Mark the agent whose `focused` is `true`, for example with a checkmark.
-3. **Footer**: a "Launch at login" toggle (added in M6) and "Quit".
+3. **Footer**: the "Menu bar shows" choice (added in M7), a "Launch at login" toggle (added in M6) and "Quit".
 
 When the herdr server isn't reachable, replace the rows with one disabled item: "herdr server is not running". Add a second disabled line below it: "Start it by running `herdr`".
 
@@ -181,3 +189,12 @@ Done when:
 Done when:
 - The toggle shows the current registration state.
 - After logging out and back in, the app is running.
+
+### M7: One dot per agent
+
+- [x] A "Menu bar shows" choice in the menu between counts per state and one dot per agent, remembered across launches.
+- [x] Done is 🔵 and unknown is ⚫ everywhere, so every state is a dot.
+
+Done when:
+- The dots are unit-tested, including that a dot keeps its place when its agent changes state.
+- Switching the choice changes the menu bar right away, and the choice survives a relaunch.

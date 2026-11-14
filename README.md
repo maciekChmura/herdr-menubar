@@ -3,20 +3,21 @@
 A macOS menu bar app that shows the live state of the AI coding agents running in [herdr](https://herdr.dev), and takes you to any of them in one click.
 
 ```
-🔴1 🟢2 ✅3 ⚪1
+🔴1 🟢2 🔵3 ⚪1     counts per state
+🟢🔴🟢🔵⚪          or one dot per agent
 ```
 
 ## What it does
 
-- **Counts in the menu bar**, one per state. They update the moment an agent changes state: the app subscribes to herdr's events instead of polling.
+- **The menu bar** shows either one count per state or one dot per agent; you pick under "Menu bar shows" in the menu. Dots stay in herdr's order, so each agent keeps its place and only its color changes. Both update the moment an agent changes state: the app subscribes to herdr's events instead of polling.
 
   | Glyph | State | Meaning |
   | --- | --- | --- |
   | 🔴 | blocked | Waiting for your answer or approval |
   | 🟢 | working | Busy |
-  | ✅ | done | Finished, and you haven't looked at it yet |
+  | 🔵 | done | Finished, and you haven't looked at it yet |
   | ⚪ | idle | Ready for input, already seen |
-  | ❔ | unknown | herdr can't tell |
+  | ⚫ | unknown | herdr can't tell |
 
 - **One row per agent** in the menu, with its state, title and folder. A checkmark marks the agent that's focused in herdr.
 - **Click to focus**: clicking an agent switches herdr to it and brings Ghostty to the front.

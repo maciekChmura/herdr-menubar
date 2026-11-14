@@ -45,7 +45,7 @@ struct AgentRowTests {
 
     @Test func fallsBackToTheAgentTypeWhenThereIsNoTitle() {
         let row = AgentRow(agent: agent("p1", .done, title: nil, folder: "project-a"))
-        #expect(row.text == "✅ claude — project-a")
+        #expect(row.text == "🔵 claude — project-a")
     }
 
     @Test func takesTheFolderFromCwdWhenThereIsNoForegroundCwd() {

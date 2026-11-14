@@ -5,6 +5,7 @@ struct HerdrMenubarApp: App {
     @State private var store: AgentStore
     @State private var notifier: Notifier
     @State private var launchAtLogin = LaunchAtLogin()
+    @AppStorage("MenuBarStyle") private var menuBarStyle: MenuBarStyle = .counts
 
     init() {
         let store = AgentStore(client: HerdrClient(socketPath: HerdrClient.resolveSocketPath()))
@@ -33,6 +34,11 @@ struct HerdrMenubarApp: App {
                 Task { await Self.focus(paneId: agent.paneId, store: store) }
             })
             Divider()
+            Picker("Menu bar shows", selection: $menuBarStyle) {
+                ForEach(MenuBarStyle.allCases, id: \.self) { style in
+                    Text(style.title).tag(style)
+                }
+            }
             Toggle(launchAtLogin.title, isOn: Binding(
                 get: { launchAtLogin.isEnabled },
                 set: { launchAtLogin.set($0) }
@@ -42,7 +48,7 @@ struct HerdrMenubarApp: App {
             }
             .keyboardShortcut("q")
         } label: {
-            MenuBarLabelView(label: MenuBarLabel(store.state))
+            MenuBarLabelView(label: MenuBarLabel(store.state, style: menuBarStyle))
         }
         .menuBarExtraStyle(.menu)
     }
@@ -70,7 +76,7 @@ struct MenuBarLabelView: View {
 
     var body: some View {
         switch label {
-        case .counts(let text):
+        case .text(let text):
             Text(text)
         case .symbol(let name):
             Image(systemName: name)
