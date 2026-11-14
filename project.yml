@@ -1,0 +1,51 @@
+name: HerdrMenubar
+
+options:
+  bundleIdPrefix: io.github.maciekchmura
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    # Ad-hoc signing ("Sign to Run Locally"): no Apple developer team needed.
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "-"
+    DEVELOPMENT_TEAM: ""
+
+targets:
+  HerdrMenubar:
+    type: application
+    platform: macOS
+    sources:
+      - HerdrMenubar
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.maciekchmura.HerdrMenubar
+        PRODUCT_NAME: HerdrMenubar
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: herdr-menubar
+        # Menu bar only: no Dock icon, no app menu.
+        INFOPLIST_KEY_LSUIElement: YES
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
+        # The sandbox would block the herdr socket in ~/.config.
+        ENABLE_APP_SANDBOX: NO
+    scheme:
+      testTargets:
+        - HerdrMenubarTests
+
+  HerdrMenubarTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - HerdrMenubarTests
+    dependencies:
+      - target: HerdrMenubar
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.maciekchmura.HerdrMenubarTests
+        GENERATE_INFOPLIST_FILE: YES

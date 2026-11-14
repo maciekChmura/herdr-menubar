@@ -12,13 +12,18 @@ A native macOS menu bar app that shows the live state of the agents in the local
 
 ## Build and run
 
-Milestone M0 replaces this section with the commands that actually work. Until then, the expected commands are:
-
 ```bash
-brew install xcodegen        # once
-xcodegen generate
-xcodebuild -scheme HerdrMenubar -configuration Debug build
+xcodegen generate                                                    # after changing project.yml or adding/removing files
+xcodebuild -scheme HerdrMenubar -configuration Debug -derivedDataPath build build
+xcodebuild -scheme HerdrMenubar -configuration Debug -derivedDataPath build test
+pkill -x HerdrMenubar; open build/Build/Products/Debug/HerdrMenubar.app   # quit the running copy, launch the new one
 ```
+
+- `xcodegen` reads the source folders when it runs, so run it again after you add or remove a Swift file. Otherwise the new file isn't compiled.
+- `-derivedDataPath build` keeps all build output in `./build`, which is gitignored, so the `.app` path above stays stable.
+- On this machine, `xcodebuild` prints `DVTCoreDeviceCore` and `CoreSimulator is out of date` errors. They come from Xcode's device and simulator support and don't affect macOS builds. Check for `** BUILD SUCCEEDED **` or `** TEST SUCCEEDED **` instead.
+- The tests use the app as their test host, so running them briefly shows the app's icon in the menu bar.
+- Tests use Swift Testing (`import Testing`, `@Test`, `#expect`).
 
 ## Don't disturb the live herdr session
 

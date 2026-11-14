@@ -118,9 +118,9 @@ Work through these in order. Tick each checkbox in the same commit as the work i
 
 ### M0: Scaffold
 
-- [ ] `project.yml` with an app target `HerdrMenubar` and a test target `HerdrMenubarTests`, macOS 14, `LSUIElement`, App Sandbox off.
-- [ ] A `MenuBarExtra` with a placeholder label and a "Quit" item.
-- [ ] The "Build and run" section of `CLAUDE.md` updated with the commands that actually work.
+- [x] `project.yml` with an app target `HerdrMenubar` and a test target `HerdrMenubarTests`, macOS 14, `LSUIElement`, App Sandbox off.
+- [x] A `MenuBarExtra` with a placeholder label and a "Quit" item.
+- [x] The "Build and run" section of `CLAUDE.md` updated with the commands that actually work.
 
 Done when:
 - `xcodegen generate` followed by an `xcodebuild` build succeeds.
