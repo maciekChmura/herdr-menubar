@@ -128,9 +128,9 @@ Done when:
 
 ### M1: herdr client and agent list
 
-- [ ] A `HerdrClient` that sends one request over a fresh connection and decodes the reply. The socket path is injectable.
-- [ ] An `Agent` model with `pane_id`, `agent`, `agent_status`, `cwd`, `foreground_cwd`, `terminal_title_stripped`, `focused`, `workspace_id` and `tab_id`. Unrecognized statuses decode as `unknown`.
-- [ ] A missing socket or refused connection produces a "not running" state, not a crash.
+- [x] A `HerdrClient` that sends one request over a fresh connection and decodes the reply. The socket path is injectable.
+- [x] An `Agent` model with `pane_id`, `agent`, `agent_status`, `cwd`, `foreground_cwd`, `terminal_title_stripped`, `focused`, `workspace_id` and `tab_id`. Unrecognized statuses decode as `unknown`.
+- [x] A missing socket or refused connection produces a "not running" state, not a crash.
 
 Done when:
 - A test decodes `docs/herdr/agent-list-example.json`.

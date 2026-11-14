@@ -23,7 +23,9 @@ pkill -x HerdrMenubar; open build/Build/Products/Debug/HerdrMenubar.app   # quit
 - `-derivedDataPath build` keeps all build output in `./build`, which is gitignored, so the `.app` path above stays stable.
 - On this machine, `xcodebuild` prints `DVTCoreDeviceCore` and `CoreSimulator is out of date` errors. They come from Xcode's device and simulator support and don't affect macOS builds. Check for `** BUILD SUCCEEDED **` or `** TEST SUCCEEDED **` instead.
 - The tests use the app as their test host, so running them briefly shows the app's icon in the menu bar.
-- Tests use Swift Testing (`import Testing`, `@Test`, `#expect`).
+- Tests use Swift Testing (`import Testing`, `@Test`, `#expect`). Tests that need a herdr server use `FakeHerdrServer` (in `HerdrMenubarTests/HerdrClientTests.swift`) on a temporary socket, never the real one.
+- To run against another socket path, for example to see the "not running" state, use `open build/Build/Products/Debug/HerdrMenubar.app --args -HerdrSocketPath /nonexistent/herdr.sock`. Quit the running copy first; otherwise `open` ignores the arguments.
+- The app logs to the unified log. In zsh, `log` is a shell builtin, so call `/usr/bin/log`: `/usr/bin/log show --info --style compact --predicate 'subsystem == "io.github.maciekchmura.HerdrMenubar"' --last 1m`.
 
 ## Don't disturb the live herdr session
 
