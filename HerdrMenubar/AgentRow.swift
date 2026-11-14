@@ -12,6 +12,15 @@ struct AgentRow: Identifiable, Equatable {
         return "\(agent.displayTitle) — \(folder)"
     }
 
+    /// Rows in the order that matches the menu bar: in dots mode, herdr's order, so the 2nd dot is the 2nd row;
+    /// in counts mode, sorted by state, like the counts.
+    static func rows(for agents: [Agent], matching style: MenuBarStyle) -> [AgentRow] {
+        switch style {
+        case .dots: agents.map(AgentRow.init)
+        case .counts: rows(for: agents)
+        }
+    }
+
     /// Rows sorted by state in display order, then by folder name.
     static func rows(for agents: [Agent]) -> [AgentRow] {
         agents

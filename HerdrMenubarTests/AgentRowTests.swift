@@ -17,6 +17,12 @@ struct AgentRowTests {
         #expect(AgentRow.rows(for: agents).map(\.id) == ["p6", "p5", "p7", "p2", "p4", "p1", "p3"])
     }
 
+    @Test func followsTheMenuBarStyle() {
+        let agents = [agent("p1", .idle, folder: "a"), agent("p2", .blocked, folder: "b"), agent("p3", .working, folder: "c")]
+        #expect(AgentRow.rows(for: agents, matching: .dots).map(\.id) == ["p1", "p2", "p3"], "Same order as the dots")
+        #expect(AgentRow.rows(for: agents, matching: .counts).map(\.id) == ["p2", "p3", "p1"], "Same order as the counts")
+    }
+
     @Test func breaksTiesByPaneSoTheOrderIsStable() {
         let agents = [agent("p9", .working, folder: "same"), agent("p1", .working, folder: "same")]
         #expect(AgentRow.rows(for: agents).map(\.id) == ["p1", "p9"])

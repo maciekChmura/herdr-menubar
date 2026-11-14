@@ -1,6 +1,6 @@
 /// How the menu bar item summarizes the agents. The user picks it in the menu.
 enum MenuBarStyle: String, CaseIterable {
-    /// A dot and a count per state. See `DotsImage.countsImage(for:)`.
+    /// A dot and a count per state. See `StatusDotsView`.
     case counts
     /// One small colored dot per agent, in herdr's order. See `DotsImage`.
     case dots
@@ -18,7 +18,7 @@ enum MenuBarLabel: Equatable {
     /// A dot and a count for each state that has agents, in display order.
     case counts([StatusCount])
     /// One dot per agent, in herdr's order, drawn by `DotsImage`.
-    case dots([AgentStatus])
+    case dots([PaneStatus])
     /// An SF Symbol name.
     case symbol(String)
 
@@ -36,7 +36,7 @@ enum MenuBarLabel: Equatable {
         case .loaded(let agents):
             switch style {
             case .counts: self = .counts(Self.statusCounts(of: agents))
-            case .dots: self = .dots(agents.map(\.agentStatus))
+            case .dots: self = .dots(agents.map { PaneStatus(paneId: $0.paneId, status: $0.agentStatus) })
             }
         }
     }
@@ -67,6 +67,12 @@ enum MenuBarLabel: Equatable {
     static func spokenSummary(of counts: [StatusCount]) -> String {
         counts.map { "\($0.count) \($0.status.rawValue)" }.joined(separator: ", ")
     }
+}
+
+/// One agent's dot in dots mode. The pane ID lets a state change fade and pop on the right dot.
+struct PaneStatus: Equatable, Sendable {
+    let paneId: String
+    let status: AgentStatus
 }
 
 struct StatusCount: Equatable, Sendable {

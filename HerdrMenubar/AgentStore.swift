@@ -44,6 +44,8 @@ final class AgentStore {
     @ObservationIgnored private var needsBaseline = true
     /// Called with the alerts from each fetch that has any. See `AgentAlert`.
     @ObservationIgnored var onAlerts: (([AgentAlert]) -> Void)?
+    /// Called with the agents whenever they change, and with none when herdr can't be read.
+    @ObservationIgnored var onAgentsChanged: (([Agent]) -> Void)?
     private let log = Logger(subsystem: "io.github.maciekchmura.HerdrMenubar", category: "herdr")
 
     init(client: HerdrClient, timing: Timing = Timing()) {
@@ -91,12 +93,12 @@ final class AgentStore {
                 if state != .notRunning {
                     log.info("herdr server is not running at \(self.client.socketPath, privacy: .public)")
                 }
-                state = .notRunning
+                setState(.notRunning)
             } catch {
                 log.error("Lost the herdr connection: \(String(describing: error), privacy: .public)")
                 needsBaseline = true
                 // Keep showing the last agents we had; the next attempt corrects them.
-                if case .loaded = state {} else { state = .failed(String(describing: error)) }
+                if case .loaded = state {} else { setState(.failed(String(describing: error))) }
             }
 
             if sessionSubscribed { retryDelay = timing.initialRetryDelay }
@@ -153,13 +155,22 @@ final class AgentStore {
         }
     }
 
+    private func setState(_ newState: State) {
+        state = newState
+        if case .loaded(let agents) = newState {
+            onAgentsChanged?(agents)
+        } else {
+            onAgentsChanged?([])
+        }
+    }
+
     private func apply(_ agents: [Agent], isBaseline: Bool = false) {
         var previous: [Agent]?
         if !isBaseline, case .loaded(let current) = state { previous = current }
         let alerts = AgentAlert.alerts(previous: previous, current: agents)
 
         if state != .loaded(agents) {
-            state = .loaded(agents)
+            setState(.loaded(agents))
             log.info("Agents: \(MenuBarLabel.counts(of: agents), privacy: .public)")
         }
         if !alerts.isEmpty { onAlerts?(alerts) }

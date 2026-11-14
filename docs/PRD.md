@@ -16,7 +16,7 @@ A native macOS menu bar app that shows the live state of the AI coding agents ru
 - No starting or stopping agents, and no managing workspaces, tabs or panes.
 - No changes to herdr's configuration, and no replacing herdr's own notifications.
 - No App Store, sandboxing or auto-update.
-- No settings window. The only settings are in the menu: what the menu bar shows, and "Launch at login".
+- No settings window. The only settings are in the menu: what the menu bar shows, "Animate dots" and "Launch at login".
 
 ## User
 
@@ -55,7 +55,7 @@ If milestone M2 finds that `pane.updated` fires too often to be useful, drop it 
 
 Any status string this app doesn't recognize is treated as `unknown`, so a newer herdr can't break decoding.
 
-Every state is shown as a small dot, 10 points across, drawn by the app in the system colors (`systemRed`, `systemGreen`, `systemBlue`, `systemGray`). The same dots appear in the menu bar and in front of each row in the dropdown. Emoji aren't used: they're drawn at text size with their own shading. The dots are non-template images, so the menu bar keeps their colors.
+Every state is shown as a small dot, 10 points across, drawn by the app in the system colors (`systemRed`, `systemGreen`, `systemBlue`, `systemGray`). The same dots appear in the menu bar and in front of each row in the dropdown. Emoji aren't used: they're drawn at text size with their own shading. In the menu bar the dots are Core Animation layers; in the dropdown they're non-template images, so the menu keeps their colors.
 
 This order (blocked, working, done, idle, unknown) is used for the counts in the menu bar and for sorting the dropdown.
 
@@ -71,18 +71,34 @@ In both styles:
 - With no agents, show the SF Symbol `circle.dashed`.
 - When the herdr server isn't reachable, show the SF Symbol `exclamationmark.circle`.
 
+## Animation
+
+The menu bar dots move gently, so it's easy to see at a glance that agents are busy or waiting:
+
+- **working**: slow breathing. The dot fades to half and back every 2.5 s. All working dots breathe in step.
+- **blocked**: every 2 s a faint ring spreads 3 points out from the dot and fades, over 1.2 s.
+- **done**: one small pop when the agent finishes. The dot grows by 30% and settles back, in 0.35 s.
+- **any state change**: the color fades from the old state to the new one over 0.3 s.
+- **idle and unknown**: still.
+
+The first time the dots are shown, after launch, a reconnect or switching the menu bar style, nothing fades or pops: only real changes do. In counts mode, the done dot pops when its count goes up.
+
+Animations are off when the user turns off "Animate dots" in the menu, and while macOS's Reduce motion setting is on. The menu item then says so.
+
+The animations are Core Animation animations that macOS plays outside the app, so they cost almost no CPU. A first version redrew the menu bar image for every frame through SwiftUI and cost about 40% of a CPU core, which is why the menu bar item and the menu are built with AppKit.
+
 ## Dropdown
 
-Use `MenuBarExtra` with `.menuBarExtraStyle(.menu)`, which gives the standard native menu look.
+An AppKit `NSMenu`, rebuilt each time it opens, and updated while it's open when the agents change.
 
 1. **Header**: a disabled item with the agent count, such as "4 agents".
-2. **Agent rows**: one item per agent, sorted by state in the order above, then by folder name. Each row shows:
+2. **Agent rows**: one item per agent, in the same order as the menu bar. In dots mode that's herdr's order, so the 2nd dot is the 2nd row. In counts mode the rows are sorted by state in the order above, like the counts, then by folder name. Each row shows:
    - the state dot, as the item's icon;
    - the title: `terminal_title_stripped`, or `agent` when the title is empty;
    - the folder: the last path component of `foreground_cwd`, falling back to `cwd`.
 
    Mark the agent whose `focused` is `true`, for example with a checkmark.
-3. **Footer**: the "Menu bar shows" choice (added in M7), a "Launch at login" toggle (added in M6) and "Quit".
+3. **Footer**: the "Menu bar shows" choice (added in M7), an "Animate dots" toggle (added in M8), a "Launch at login" toggle (added in M6) and "Quit".
 
 When the herdr server isn't reachable, replace the rows with one disabled item: "herdr server is not running". Add a second disabled line below it: "Start it by running `herdr`".
 
@@ -106,8 +122,8 @@ Focusing an agent marks it as seen, so a `done` agent turns `idle`. This is expe
 
 ## Platform and technical decisions
 
-- **macOS 14 or later.** This is required for Observation (`@Observable`). `MenuBarExtra` and `SMAppService` need macOS 13.
-- **Swift and SwiftUI**, with no third-party dependencies.
+- **macOS 14 or later.** This is required for Observation (`@Observable`). `SMAppService` needs macOS 13.
+- **Swift**, with no third-party dependencies. The menu bar item (`NSStatusItem`) and the menu (`NSMenu`) are AppKit, so the dots can be Core Animation layers; see "Animation". SwiftUI only provides the app's entry point.
 - **Socket I/O** through Network.framework (`NWEndpoint.unix(path:)`) or POSIX sockets. The socket path is injectable, so tests and the "not running" state can use a path that doesn't exist.
 - **No Dock icon**: `LSUIElement = YES`.
 - **App Sandbox off**: the sandbox would block access to the socket in `~/.config`.
@@ -198,3 +214,14 @@ Done when:
 Done when:
 - The dots are unit-tested, including that a dot keeps its place when its agent changes state.
 - Switching the choice changes the menu bar right away, and the choice survives a relaunch.
+
+### M8: Animated dots
+
+- [x] Breathing for working dots, a spreading ring for blocked dots, a pop when an agent finishes, and a color fade on every state change, as described in "Animation".
+- [x] An "Animate dots" toggle in the menu, remembered across launches, and no animation while Reduce motion is on.
+- [x] The menu bar item and the menu rebuilt in AppKit, so the animations run in Core Animation.
+
+Done when:
+- The animations are unit-tested: their timing, which dots get which animation, and that the first show neither fades nor pops.
+- With agents working, the app uses close to 0% CPU.
+- The menu still works as before: agent rows with dots and the checkmark, clicking an agent, the "Menu bar shows" choice, and both toggles.

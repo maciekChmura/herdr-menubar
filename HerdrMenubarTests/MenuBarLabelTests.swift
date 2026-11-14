@@ -24,14 +24,18 @@ struct MenuBarLabelTests {
 
     @Test func showsOneDotPerAgentInHerdrsOrder() {
         let agents = [agent(.working), agent(.blocked), agent(.done), agent(.idle), agent(.unknown), agent(.working)]
-        #expect(MenuBarLabel(.loaded(agents), style: .dots) == .dots([.working, .blocked, .done, .idle, .unknown, .working]))
+        #expect(dotStatuses(MenuBarLabel(.loaded(agents), style: .dots)) == [.working, .blocked, .done, .idle, .unknown, .working])
     }
 
     @Test func aDotKeepsItsPlaceWhenItsAgentChangesState() {
         let before = [agent(.working, pane: "a"), agent(.working, pane: "b"), agent(.working, pane: "c")]
         let after = [agent(.working, pane: "a"), agent(.blocked, pane: "b"), agent(.working, pane: "c")]
-        #expect(MenuBarLabel(.loaded(before), style: .dots) == .dots([.working, .working, .working]))
-        #expect(MenuBarLabel(.loaded(after), style: .dots) == .dots([.working, .blocked, .working]))
+        #expect(MenuBarLabel(.loaded(before), style: .dots) == .dots([
+            PaneStatus(paneId: "a", status: .working), PaneStatus(paneId: "b", status: .working), PaneStatus(paneId: "c", status: .working),
+        ]))
+        #expect(MenuBarLabel(.loaded(after), style: .dots) == .dots([
+            PaneStatus(paneId: "a", status: .working), PaneStatus(paneId: "b", status: .blocked), PaneStatus(paneId: "c", status: .working),
+        ]))
     }
 
     @Test func spokenSummaryNamesEachStateInDisplayOrder() {
@@ -53,6 +57,11 @@ struct MenuBarLabelTests {
     func showsTheUnreachableSymbolWhenHerdrCantBeRead(style: MenuBarStyle) {
         #expect(MenuBarLabel(.notRunning, style: style) == .symbol("exclamationmark.circle"))
         #expect(MenuBarLabel(.failed("timed out"), style: style) == .symbol("exclamationmark.circle"))
+    }
+
+    private func dotStatuses(_ label: MenuBarLabel) -> [AgentStatus]? {
+        guard case .dots(let panes) = label else { return nil }
+        return panes.map(\.status)
     }
 
     private func agent(_ status: AgentStatus, pane: String? = nil) -> Agent {

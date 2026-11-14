@@ -1,0 +1,144 @@
+import AppKit
+
+/// The menu bar item and its menu, built with AppKit.
+///
+/// SwiftUI's `MenuBarExtra` can't host Core Animation layers, and redrawing its label for every animation
+/// frame cost about 40% of a CPU core. Here the dots are layers (`StatusDotsView`) that macOS animates.
+@MainActor
+final class StatusItemController: NSObject, NSMenuDelegate {
+    private let store: AgentStore
+    private let notifier = Notifier()
+    private let launchAtLogin = LaunchAtLogin()
+    private let animation = DotAnimationSettings()
+    private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    private let dotsView = StatusDotsView()
+    private let menu = NSMenu()
+    private var isMenuOpen = false
+
+    private static let styleKey = "MenuBarStyle"
+
+    private var style: MenuBarStyle {
+        MenuBarStyle(rawValue: UserDefaults.standard.string(forKey: Self.styleKey) ?? "") ?? .counts
+    }
+
+    override init() {
+        store = AgentStore(client: HerdrClient(socketPath: HerdrClient.resolveSocketPath()))
+        super.init()
+
+        statusItem.button?.addSubview(dotsView)
+        menu.delegate = self
+        statusItem.menu = menu
+
+        store.onAgentsChanged = { [weak self] _ in self?.refresh() }
+        store.onAlerts = { [weak self] alerts in self?.post(alerts) }
+        // Clicking a notification does the same as clicking the agent's row.
+        notifier.onOpen = { [weak self] paneId in self?.focus(paneId: paneId) }
+        animation.onChange = { [weak self] in self?.refresh() }
+
+        notifier.requestAuthorization()
+        refresh()
+        store.start()
+    }
+
+    // MARK: Menu bar item
+
+    private func refresh() {
+        updateStatusItem()
+        if isMenuOpen { rebuildMenu() }
+    }
+
+    private func updateStatusItem() {
+        guard let button = statusItem.button else { return }
+        let height = NSStatusBar.system.thickness
+        switch MenuBarLabel(store.state, style: style) {
+        case .symbol(let name):
+            // When the dots come back, they start fresh rather than fading from what they showed before.
+            dotsView.reset()
+            dotsView.isHidden = true
+            button.image = NSImage(systemSymbolName: name, accessibilityDescription: nil)
+            statusItem.length = NSStatusItem.variableLength
+            button.setAccessibilityLabel(name == MenuBarLabel.unreachableSymbol ? "herdr is not running" : "No agents")
+        case .dots(let panes):
+            show(.dots(panes), in: button, height: height)
+            button.setAccessibilityLabel(MenuBarLabel.spokenSummary(of: MenuBarLabel.statusCounts(of: panes.map(\.status))))
+        case .counts(let counts):
+            show(.counts(counts), in: button, height: height)
+            button.setAccessibilityLabel(MenuBarLabel.spokenSummary(of: counts))
+        }
+    }
+
+    private func show(_ content: StatusDotsView.Content, in button: NSStatusBarButton, height: CGFloat) {
+        button.image = nil
+        dotsView.isHidden = false
+        let width = dotsView.show(content, animationsEnabled: animation.isEnabled, height: height)
+        dotsView.frame = NSRect(x: 0, y: 0, width: width, height: height)
+        statusItem.length = width
+    }
+
+    // MARK: Menu
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        launchAtLogin.refresh()
+        rebuildMenu()
+    }
+
+    func menuWillOpen(_ menu: NSMenu) {
+        isMenuOpen = true
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        isMenuOpen = false
+    }
+
+    private func rebuildMenu() {
+        let settings = StatusMenu.Settings(
+            style: style,
+            animationTitle: animation.toggleTitle,
+            animationOn: animation.userEnabled,
+            launchAtLoginTitle: launchAtLogin.title,
+            launchAtLoginOn: launchAtLogin.isEnabled
+        )
+        menu.items = StatusMenu.items(for: store.state, settings: settings, target: self)
+    }
+
+    @objc func selectAgent(_ sender: NSMenuItem) {
+        guard let paneId = sender.representedObject as? String else { return }
+        focus(paneId: paneId)
+    }
+
+    @objc func selectStyle(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, MenuBarStyle(rawValue: raw) != nil else { return }
+        UserDefaults.standard.set(raw, forKey: Self.styleKey)
+        // The dots belong to the other style; start fresh so nothing fades or pops.
+        dotsView.reset()
+        refresh()
+    }
+
+    @objc func toggleAnimation(_ sender: NSMenuItem) {
+        animation.userEnabled.toggle()
+    }
+
+    @objc func toggleLaunchAtLogin(_ sender: NSMenuItem) {
+        launchAtLogin.set(!launchAtLogin.isEnabled)
+    }
+
+    // MARK: Actions
+
+    /// Focuses the agent in herdr and brings the terminal to the front, or beeps if herdr refused.
+    private func focus(paneId: String) {
+        Task {
+            if await store.focus(paneId: paneId) {
+                TerminalApp.activate()
+            } else {
+                NSSound.beep()
+            }
+        }
+    }
+
+    private func post(_ alerts: [AgentAlert]) {
+        let terminalIsFrontmost = TerminalApp.isFrontmost
+        for alert in alerts where alert.shouldPost(terminalIsFrontmost: terminalIsFrontmost) {
+            notifier.post(alert)
+        }
+    }
+}

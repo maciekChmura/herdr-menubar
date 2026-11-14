@@ -19,6 +19,7 @@ Small colored dots in the menu bar: one per agent, or one per state followed by 
 - **One row per agent** in the menu, with its state dot, title and folder. A checkmark marks the agent that's focused in herdr.
 - **Click to focus**: clicking an agent switches herdr to it and brings Ghostty to the front.
 - **Notifications** when an agent gets blocked or finishes. Clicking one does the same as clicking the agent in the menu. You don't get one for the agent you're already looking at.
+- **Gentle animation**: working dots breathe, a blocked dot sends out a faint ring, a dot pops when its agent finishes, and colors fade on every change. Core Animation plays it, so it costs almost no CPU. Turn it off with "Animate dots" in the menu; it's also off while macOS's Reduce motion is on.
 - **Launch at login**, from a toggle in the menu.
 
 It's deliberately small: it isn't a terminal, it never sends input to agents, and it has no settings window.

@@ -54,7 +54,9 @@ final class LaunchAtLogin {
 
     /// Reads the status again, for example after the user changed it in System Settings.
     func refresh() {
-        status = SMAppService.mainApp.status
+        let current = SMAppService.mainApp.status
+        guard current != status else { return }
+        status = current
         log.info("Launch at login: \(Self.name(of: self.status), privacy: .public)")
     }
 }
