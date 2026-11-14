@@ -21,11 +21,20 @@ The repo is public, so the examples were anonymized: paths, terminal titles, tab
 - **One request per connection**: the server closes the connection after it replies to an ordinary request. A second write on the same connection fails with a broken pipe. Open a new connection for each call.
 - **Subscriptions**: `events.subscribe` keeps its connection open. The server first acknowledges with `{"id": "<id>", "result": {"type": "subscription_started"}}`.
 - **`pane.agent_status_changed` needs a `pane_id`**: there is no single subscription for every agent's status. The other `pane.*` subscriptions (`pane.created`, `pane.closed`, `pane.updated`, `pane.exited`, `pane.agent_detected`) take no parameters.
+- **Event envelope**: after the acknowledgement, each event is one line shaped like `{"event": "<kind>", "data": {...}}`. A status change looks like this:
+
+  ```json
+  {"data":{"agent":"claude","agent_status":"done","pane_id":"w1:pB","workspace_id":"w1"},"event":"pane.agent_status_changed"}
+  ```
+
+- **A status change fires only `pane.agent_status_changed`.** In about 13 minutes, with 4 agents and several status and focus changes, `pane.updated` never fired. It isn't noisy, but it also isn't a signal for status changes.
+- **Several events can arrive at once**: when two agents in the same tab went from `done` to `idle` together, both events arrived in the same instant.
+- **No heartbeat**: while nothing changes, the subscription stays silent and open. In one stretch, more than 9 minutes passed between events.
+- **Event names don't always match subscription types**: subscribing to `pane.focused`, `tab.focused` or `workspace.focused` delivers events named `pane_focused`, `tab_focused` and `workspace_focused`, with an extra `type` field in `data`. Status events keep the dotted name `pane.agent_status_changed`.
+- **`done` can turn `idle` without any focus event**: the two agents that went `done` to `idle` together did so with no `*_focused` event before them.
 
 ## Not yet verified
 
-- **Event envelope**: according to the schema, each event after the acknowledgement is `{"event": "<kind>", "data": {...}}`. No event arrived during a 30-second probe, so this hasn't been seen on the wire.
-- **Which events fire on a status change**: only `pane.agent_status_changed` is certain to fire. It's unknown whether `pane.updated` fires as well, and how often (for example, on every terminal title change).
 - **`agent.focus` target**: the CLI accepts an agent name. It hasn't been tested whether the API also accepts a `pane_id` as `target`.
 
 Whoever verifies one of these should move it to the section above.

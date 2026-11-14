@@ -25,7 +25,8 @@ pkill -x HerdrMenubar; open build/Build/Products/Debug/HerdrMenubar.app   # quit
 - The tests use the app as their test host, so running them briefly shows the app's icon in the menu bar.
 - Tests use Swift Testing (`import Testing`, `@Test`, `#expect`). Tests that need a herdr server use `FakeHerdrServer` (in `HerdrMenubarTests/HerdrClientTests.swift`) on a temporary socket, never the real one.
 - To run against another socket path, for example to see the "not running" state, use `open build/Build/Products/Debug/HerdrMenubar.app --args -HerdrSocketPath /nonexistent/herdr.sock`. Quit the running copy first; otherwise `open` ignores the arguments.
-- The app logs to the unified log. In zsh, `log` is a shell builtin, so call `/usr/bin/log`: `/usr/bin/log show --info --style compact --predicate 'subsystem == "io.github.maciekchmura.HerdrMenubar"' --last 1m`.
+- The app logs to the unified log. In zsh, `log` is a shell builtin, so call `/usr/bin/log`: `/usr/bin/log show --info --style compact --predicate 'subsystem == "io.github.maciekchmura.HerdrMenubar"' --last 1m`. It logs connecting, each change in the agent counts, and lost connections.
+- Each herdr event is logged at debug level, which `log show` doesn't keep. Watch events live with `/usr/bin/log stream --level debug --style compact --predicate 'subsystem == "io.github.maciekchmura.HerdrMenubar"'`.
 
 ## Don't disturb the live herdr session
 

@@ -3,13 +3,11 @@ import Foundation
 import Testing
 @testable import HerdrMenubar
 
-/// Exercises the real socket code against a fake herdr server on a temporary socket.
-/// These tests never touch the user's herdr server.
+/// Exercises the real socket code against `FakeHerdrServer`.
 struct HerdrClientTests {
     @Test func listsAgentsFromTheServerReply() async throws {
         let server = try FakeHerdrServer { request in
-            let id = request["id"] as? String ?? ""
-            return #"{"id":"\#(id)","result":{"type":"agent_list","agents":[{"agent":"claude","agent_status":"blocked","focused":true,"pane_id":"w1:p1","tab_id":"w1:t1","workspace_id":"w1","terminal_id":"term_1","revision":1,"terminal_title_stripped":"Fix tests"}]}}"#
+            .reply(FakeHerdr.agentList(id: request["id"] as? String ?? "", [("w1:p1", "blocked")]))
         }
         defer { server.stop() }
 
@@ -17,7 +15,7 @@ struct HerdrClientTests {
 
         #expect(agents.map(\.paneId) == ["w1:p1"])
         #expect(agents.first?.agentStatus == .blocked)
-        #expect(agents.first?.displayTitle == "Fix tests")
+        #expect(agents.first?.displayTitle == "Task in w1:p1")
 
         let request = try #require(server.requests.first)
         #expect(request["method"] as? String == "agent.list")
@@ -52,7 +50,7 @@ struct HerdrClientTests {
     }
 
     @Test func reportsAConnectionClosedWithoutAReply() async throws {
-        let server = try FakeHerdrServer { _ in nil }
+        let server = try FakeHerdrServer { _ in .close }
         defer { server.stop() }
 
         await #expect(throws: HerdrError.connectionClosed) {
@@ -63,7 +61,7 @@ struct HerdrClientTests {
     @Test func timesOutWhenTheServerNeverReplies() async throws {
         let server = try FakeHerdrServer { _ in
             Thread.sleep(forTimeInterval: 1)
-            return nil
+            return .close
         }
         defer { server.stop() }
 
@@ -71,6 +69,59 @@ struct HerdrClientTests {
         client.timeout = 0.2
         await #expect(throws: HerdrError.timedOut) {
             try await client.listAgents()
+        }
+    }
+
+    @Test func subscriptionSendsTheRequestedSubscriptions() async throws {
+        let server = try FakeHerdrServer { request in
+            .replyAndHold(FakeHerdr.subscriptionStarted(id: request["id"] as? String ?? ""))
+        }
+        defer { server.stop() }
+
+        _ = try await HerdrClient(socketPath: server.path).subscribe([
+            Subscription(type: "pane.created"),
+            Subscription(type: "pane.agent_status_changed", paneId: "w1:p1"),
+        ])
+
+        let request = try #require(server.requests(method: "events.subscribe").first)
+        let subscriptions = (request["params"] as? [String: Any])?["subscriptions"] as? [[String: String]]
+        #expect(subscriptions == [
+            ["type": "pane.created"],
+            ["type": "pane.agent_status_changed", "pane_id": "w1:p1"],
+        ])
+    }
+
+    @Test func subscriptionYieldsEventKindsUntilTheServerCloses() async throws {
+        let server = try FakeHerdrServer { request in
+            .replyAndHold(FakeHerdr.subscriptionStarted(id: request["id"] as? String ?? ""))
+        }
+        defer { server.stop() }
+
+        let events = try await HerdrClient(socketPath: server.path).subscribe([Subscription(type: "pane.updated")])
+        // Both lines can arrive in one read; neither may be lost.
+        server.push(FakeHerdr.event("pane.agent_status_changed", pane: "w1:p1") + "\n" + FakeHerdr.event("pane.updated", pane: "w1:p1"))
+
+        var iterator = events.makeAsyncIterator()
+        #expect(try await iterator.next() == "pane.agent_status_changed")
+        #expect(try await iterator.next() == "pane.updated")
+
+        server.dropHeldConnections()
+        do {
+            _ = try await iterator.next()
+            Issue.record("Expected the stream to end with connectionClosed")
+        } catch {
+            #expect(error as? HerdrError == .connectionClosed)
+        }
+    }
+
+    @Test func subscriptionThrowsTheServerError() async throws {
+        let server = try FakeHerdrServer { request in
+            .reply(FakeHerdr.error(id: request["id"] as? String ?? "", code: "invalid_params", message: "bad subscription"))
+        }
+        defer { server.stop() }
+
+        await #expect(throws: HerdrError.server(code: "invalid_params", message: "bad subscription")) {
+            _ = try await HerdrClient(socketPath: server.path).subscribe([Subscription(type: "pane.updated")])
         }
     }
 
@@ -85,53 +136,5 @@ struct HerdrClientTests {
         defaults.set("/defaults.sock", forKey: "HerdrSocketPath")
         #expect(HerdrClient.resolveSocketPath(defaults: defaults, environment: ["HERDR_SOCKET_PATH": "/env.sock"], home: home)
             == "/defaults.sock")
-    }
-}
-
-/// Accepts one connection on a temporary Unix socket, reads one request line,
-/// and replies with whatever `handler` returns (or closes without replying when it returns nil).
-final class FakeHerdrServer: @unchecked Sendable {
-    let path: String
-    private let listener: Int32
-    private let lock = NSLock()
-    private var receivedRequests: [[String: Any]] = []
-
-    var requests: [[String: Any]] {
-        lock.withLock { receivedRequests }
-    }
-
-    static func temporarySocketPath() -> String {
-        // Unix socket paths are limited to 104 bytes, so keep the name short.
-        NSTemporaryDirectory() + "hm-\(UUID().uuidString.prefix(8)).sock"
-    }
-
-    init(handler: @escaping @Sendable ([String: Any]) -> String?) throws {
-        path = Self.temporarySocketPath()
-        listener = socket(AF_UNIX, SOCK_STREAM, 0)
-        var addr = try UnixSocket.address(path)
-        let bound = withUnsafePointer(to: &addr) {
-            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                bind(listener, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
-            }
-        }
-        guard bound == 0, listen(listener, 1) == 0 else { throw HerdrError.io(errno: errno) }
-
-        Thread.detachNewThread { [self] in
-            let connection = accept(listener, nil, nil)
-            guard connection >= 0 else { return }
-            defer { close(connection) }
-            guard let line = try? UnixSocket.readLine(fd: connection),
-                  let request = try? JSONSerialization.jsonObject(with: line) as? [String: Any]
-            else { return }
-            lock.withLock { receivedRequests.append(request) }
-            if let reply = handler(request) {
-                try? UnixSocket.writeAll(fd: connection, data: Data((reply + "\n").utf8))
-            }
-        }
-    }
-
-    func stop() {
-        close(listener)
-        unlink(path)
     }
 }

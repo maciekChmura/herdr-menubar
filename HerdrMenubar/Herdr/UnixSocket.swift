@@ -11,19 +11,14 @@ enum UnixSocket {
         return try readLine(fd: fd)
     }
 
-    /// Opens a stream socket connected to `path`.
+    /// Opens a stream socket connected to `path`, with `timeout` applied to reads and writes.
     /// Throws `HerdrError.notRunning` when the socket file is missing or nothing accepts connections on it.
     static func connect(path: String, timeout: TimeInterval) throws -> Int32 {
         var addr = try address(path)
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { throw HerdrError.io(errno: errno) }
 
-        var tv = timeval(
-            tv_sec: Int(timeout),
-            tv_usec: Int32((timeout - timeout.rounded(.down)) * 1_000_000)
-        )
-        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
-        setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+        setTimeouts(fd: fd, timeout)
         // Without this, writing to a socket the server already closed kills the app with SIGPIPE.
         var on: Int32 = 1
         setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
@@ -40,6 +35,16 @@ enum UnixSocket {
             throw HerdrError.io(errno: error)
         }
         return fd
+    }
+
+    /// Sets the read and write timeouts. Zero means wait forever.
+    static func setTimeouts(fd: Int32, _ timeout: TimeInterval) {
+        var tv = timeval(
+            tv_sec: Int(timeout),
+            tv_usec: Int32((timeout - timeout.rounded(.down)) * 1_000_000)
+        )
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+        setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
     }
 
     /// Builds a `sockaddr_un` for `path`.
@@ -71,12 +76,33 @@ enum UnixSocket {
         }
     }
 
-    /// Reads until the first newline and returns the bytes before it.
-    /// If the peer closes the connection first, returns what arrived, or throws `connectionClosed` if nothing did.
+    /// Reads one line. Throws `connectionClosed` if the peer closes the connection before sending anything.
     static func readLine(fd: Int32) throws -> Data {
-        var line = Data()
-        var chunk = [UInt8](repeating: 0, count: 64 * 1024)
+        guard let line = try LineReader(fd: fd).next() else { throw HerdrError.connectionClosed }
+        return line
+    }
+}
+
+/// Splits a socket's byte stream into newline-terminated lines.
+/// Bytes that arrive after the current line are kept for the next call, so no line is lost.
+final class LineReader {
+    private let fd: Int32
+    private var buffer = Data()
+    private var chunk = [UInt8](repeating: 0, count: 64 * 1024)
+
+    init(fd: Int32) {
+        self.fd = fd
+    }
+
+    /// Returns the next line without its newline, or nil once the peer has closed the connection.
+    /// A last line that has no newline is returned as it is.
+    func next() throws -> Data? {
         while true {
+            if let newline = buffer.firstIndex(of: UInt8(ascii: "\n")) {
+                let line = Data(buffer[buffer.startIndex..<newline])
+                buffer.removeSubrange(buffer.startIndex...newline)
+                return line
+            }
             let count = read(fd, &chunk, chunk.count)
             if count < 0 {
                 if errno == EINTR { continue }
@@ -84,14 +110,11 @@ enum UnixSocket {
                 throw HerdrError.io(errno: errno)
             }
             if count == 0 {
-                if line.isEmpty { throw HerdrError.connectionClosed }
-                return line
+                if buffer.isEmpty { return nil }
+                defer { buffer.removeAll() }
+                return buffer
             }
-            if let newline = chunk[..<count].firstIndex(of: UInt8(ascii: "\n")) {
-                line.append(contentsOf: chunk[..<newline])
-                return line
-            }
-            line.append(contentsOf: chunk[..<count])
+            buffer.append(contentsOf: chunk[..<count])
         }
     }
 }

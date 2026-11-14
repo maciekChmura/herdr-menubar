@@ -7,8 +7,7 @@ struct HerdrMenubarApp: App {
     init() {
         let store = AgentStore(client: HerdrClient(socketPath: HerdrClient.resolveSocketPath()))
         _store = State(initialValue: store)
-        // M1 loads the agents once at launch. M2 keeps them live.
-        Task { await store.refresh() }
+        store.start()
     }
 
     var body: some Scene {
@@ -20,10 +19,22 @@ struct HerdrMenubarApp: App {
             }
             .keyboardShortcut("q")
         } label: {
-            // Placeholder until M2 draws the per-state counts.
-            Image(systemName: "circle.dashed")
+            MenuBarLabelView(label: MenuBarLabel(store.state))
         }
         .menuBarExtraStyle(.menu)
+    }
+}
+
+struct MenuBarLabelView: View {
+    let label: MenuBarLabel
+
+    var body: some View {
+        switch label {
+        case .counts(let text):
+            Text(text)
+        case .symbol(let name):
+            Image(systemName: name)
+        }
     }
 }
 

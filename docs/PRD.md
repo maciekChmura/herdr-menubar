@@ -139,9 +139,9 @@ Done when:
 
 ### M2: Live state in the menu bar
 
-- [ ] A subscription and refetch loop as described in "Keeping state in sync".
-- [ ] Label formatting as described in "Menu bar label".
-- [ ] Reconnect with backoff.
+- [x] A subscription and refetch loop as described in "Keeping state in sync".
+- [x] Label formatting as described in "Menu bar label".
+- [x] Reconnect with backoff.
 
 Done when:
 - A real state change in herdr shows up in the menu bar within about one second, without polling.
