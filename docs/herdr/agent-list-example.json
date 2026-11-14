@@ -1,0 +1,93 @@
+{
+  "id": "cli:agent:list",
+  "result": {
+    "agents": [
+      {
+        "agent": "claude",
+        "agent_session": {
+          "agent": "claude",
+          "kind": "id",
+          "source": "herdr:claude",
+          "value": "00000000-0000-4000-8000-000000000001"
+        },
+        "agent_status": "working",
+        "cwd": "/Users/me/dev/project-a",
+        "focused": false,
+        "foreground_cwd": "/Users/me/dev/project-a",
+        "pane_id": "w1:p6",
+        "revision": 2,
+        "state_change_seq": 120,
+        "tab_id": "w1:t5",
+        "terminal_id": "term_6603dc063075e1",
+        "terminal_title": "◐ Example task 1",
+        "terminal_title_stripped": "Example task 1",
+        "workspace_id": "w1"
+      },
+      {
+        "agent": "claude",
+        "agent_session": {
+          "agent": "claude",
+          "kind": "id",
+          "source": "herdr:claude",
+          "value": "00000000-0000-4000-8000-000000000002"
+        },
+        "agent_status": "working",
+        "cwd": "/Users/me/dev/project-b",
+        "focused": false,
+        "foreground_cwd": "/Users/me/dev/project-b",
+        "pane_id": "w1:p9",
+        "revision": 8,
+        "state_change_seq": 119,
+        "tab_id": "w1:t5",
+        "terminal_id": "term_6603dcf18d22f4",
+        "terminal_title": "◐ Example task 2",
+        "terminal_title_stripped": "Example task 2",
+        "workspace_id": "w1"
+      },
+      {
+        "agent": "claude",
+        "agent_session": {
+          "agent": "claude",
+          "kind": "id",
+          "source": "herdr:claude",
+          "value": "00000000-0000-4000-8000-000000000003"
+        },
+        "agent_status": "idle",
+        "completion_seq": 23,
+        "cwd": "/Users/me/dev/project-c",
+        "focused": false,
+        "foreground_cwd": "/Users/me/dev/project-c",
+        "pane_id": "w1:pA",
+        "revision": 10,
+        "state_change_seq": 23,
+        "tab_id": "w1:t6",
+        "terminal_id": "term_66040437f3eb55",
+        "terminal_title": "✳ Example task 3",
+        "terminal_title_stripped": "Example task 3",
+        "workspace_id": "w1"
+      },
+      {
+        "agent": "claude",
+        "agent_session": {
+          "agent": "claude",
+          "kind": "id",
+          "source": "herdr:claude",
+          "value": "00000000-0000-4000-8000-000000000004"
+        },
+        "agent_status": "working",
+        "cwd": "/Users/me/dev/project-d",
+        "focused": true,
+        "foreground_cwd": "/Users/me/dev/project-d",
+        "pane_id": "w1:pB",
+        "revision": 38,
+        "state_change_seq": 117,
+        "tab_id": "w1:t7",
+        "terminal_id": "term_660413740442a6",
+        "terminal_title": "◑ Example task 4",
+        "terminal_title_stripped": "Example task 4",
+        "workspace_id": "w1"
+      }
+    ],
+    "type": "agent_list"
+  }
+}
