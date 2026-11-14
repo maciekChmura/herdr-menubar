@@ -151,7 +151,7 @@ Done when:
 
 ### M3: Dropdown
 
-- [ ] A header, agent rows, a marker on the focused agent, and the "not running" item, as described in "Dropdown".
+- [x] A header, agent rows, a marker on the focused agent, and the "not running" item, as described in "Dropdown".
 
 Done when:
 - The rows match the spec.

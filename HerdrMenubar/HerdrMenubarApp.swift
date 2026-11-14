@@ -12,7 +12,8 @@ struct HerdrMenubarApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            AgentMenu(state: store.state)
+            // M4 focuses the selected agent.
+            AgentMenu(state: store.state, onSelect: { _ in })
             Divider()
             Button("Quit") {
                 NSApplication.shared.terminate(nil)
@@ -38,9 +39,10 @@ struct MenuBarLabelView: View {
     }
 }
 
-/// The agent part of the dropdown. M3 turns these into full rows.
+/// The agent part of the dropdown: a header and one row per agent, or a status message.
 struct AgentMenu: View {
     let state: AgentStore.State
+    let onSelect: (Agent) -> Void
 
     var body: some View {
         switch state {
@@ -48,15 +50,21 @@ struct AgentMenu: View {
             Text("Loading…")
         case .notRunning:
             Text("herdr server is not running")
-            Text("Start it by running herdr")
+            Text("Start it by running \"herdr\" in a terminal")
         case .failed(let message):
             Text("Couldn't read agents from herdr")
             Text(message)
-        case .loaded(let agents) where agents.isEmpty:
-            Text("No agents")
         case .loaded(let agents):
-            ForEach(agents) { agent in
-                Text(agent.displayTitle)
+            Text(AgentRow.header(agentCount: agents.count))
+            if !agents.isEmpty {
+                Divider()
+                ForEach(AgentRow.rows(for: agents)) { row in
+                    // A toggle shows the native menu checkmark on the focused agent.
+                    Toggle(row.text, isOn: Binding(
+                        get: { row.agent.focused },
+                        set: { _ in onSelect(row.agent) }
+                    ))
+                }
             }
         }
     }
