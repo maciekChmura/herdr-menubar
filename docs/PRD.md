@@ -176,7 +176,7 @@ Done when:
 
 ### M6: Launch at login
 
-- [ ] A "Launch at login" toggle in the dropdown, using `SMAppService.mainApp`.
+- [x] A "Launch at login" toggle in the dropdown, using `SMAppService.mainApp`.
 
 Done when:
 - The toggle shows the current registration state.

@@ -19,6 +19,7 @@ xcodebuild -scheme HerdrMenubar -configuration Debug -derivedDataPath build test
 pkill -x HerdrMenubar; open build/Build/Products/Debug/HerdrMenubar.app   # quit the running copy, launch the new one
 ```
 
+- `scripts/install.sh` builds the Release version, quits any running copy, installs it to `/Applications` and launches it. That's the copy for everyday use and for "Launch at login", which registers the app at the path it's running from. The Debug commands above also quit the installed copy; run the script again to get it back.
 - `xcodegen` reads the source folders when it runs, so run it again after you add or remove a Swift file. Otherwise the new file isn't compiled.
 - `-derivedDataPath build` keeps all build output in `./build`, which is gitignored, so the `.app` path above stays stable.
 - On this machine, `xcodebuild` prints `DVTCoreDeviceCore` and `CoreSimulator is out of date` errors. They come from Xcode's device and simulator support and don't affect macOS builds. Check for `** BUILD SUCCEEDED **` or `** TEST SUCCEEDED **` instead.

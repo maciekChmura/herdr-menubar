@@ -4,6 +4,7 @@ import SwiftUI
 struct HerdrMenubarApp: App {
     @State private var store: AgentStore
     @State private var notifier: Notifier
+    @State private var launchAtLogin = LaunchAtLogin()
 
     init() {
         let store = AgentStore(client: HerdrClient(socketPath: HerdrClient.resolveSocketPath()))
@@ -32,6 +33,10 @@ struct HerdrMenubarApp: App {
                 Task { await Self.focus(paneId: agent.paneId, store: store) }
             })
             Divider()
+            Toggle(launchAtLogin.title, isOn: Binding(
+                get: { launchAtLogin.isEnabled },
+                set: { launchAtLogin.set($0) }
+            ))
             Button("Quit") {
                 NSApplication.shared.terminate(nil)
             }
