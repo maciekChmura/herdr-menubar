@@ -76,8 +76,14 @@ struct MenuBarLabelView: View {
 
     var body: some View {
         switch label {
-        case .text(let text):
-            Text(text)
+        case .counts(let counts):
+            Image(nsImage: DotsImage.countsImage(for: counts))
+                .renderingMode(.original)
+                .accessibilityLabel(MenuBarLabel.spokenSummary(of: counts))
+        case .dots(let statuses):
+            Image(nsImage: DotsImage.image(for: statuses))
+                .renderingMode(.original)
+                .accessibilityLabel(MenuBarLabel.spokenSummary(of: MenuBarLabel.statusCounts(of: statuses)))
         case .symbol(let name):
             Image(systemName: name)
         }
@@ -105,10 +111,19 @@ struct AgentMenu: View {
                 Divider()
                 ForEach(AgentRow.rows(for: agents)) { row in
                     // A toggle shows the native menu checkmark on the focused agent.
-                    Toggle(row.text, isOn: Binding(
+                    Toggle(isOn: Binding(
                         get: { row.agent.focused },
                         set: { _ in onSelect(row.agent) }
-                    ))
+                    )) {
+                        Label {
+                            Text(row.title)
+                        } icon: {
+                            Image(nsImage: DotsImage.menuIcon(for: row.agent.agentStatus))
+                                .renderingMode(.original)
+                        }
+                        // Menus on macOS show only the title unless the label asks for the icon too.
+                        .labelStyle(.titleAndIcon)
+                    }
                 }
             }
         }

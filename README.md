@@ -2,24 +2,21 @@
 
 A macOS menu bar app that shows the live state of the AI coding agents running in [herdr](https://herdr.dev), and takes you to any of them in one click.
 
-```
-🔴1 🟢2 🔵3 ⚪1     counts per state
-🟢🔴🟢🔵⚪          or one dot per agent
-```
+Small colored dots in the menu bar: one per agent, or one per state followed by how many agents are in it.
 
 ## What it does
 
 - **The menu bar** shows either one count per state or one dot per agent; you pick under "Menu bar shows" in the menu. Dots stay in herdr's order, so each agent keeps its place and only its color changes. Both update the moment an agent changes state: the app subscribes to herdr's events instead of polling.
 
-  | Glyph | State | Meaning |
+  | Dot | State | Meaning |
   | --- | --- | --- |
-  | 🔴 | blocked | Waiting for your answer or approval |
-  | 🟢 | working | Busy |
-  | 🔵 | done | Finished, and you haven't looked at it yet |
-  | ⚪ | idle | Ready for input, already seen |
-  | ⚫ | unknown | herdr can't tell |
+  | Red | blocked | Waiting for your answer or approval |
+  | Green | working | Busy |
+  | Blue | done | Finished, and you haven't looked at it yet |
+  | Gray | idle | Ready for input, already seen |
+  | Gray ring | unknown | herdr can't tell |
 
-- **One row per agent** in the menu, with its state, title and folder. A checkmark marks the agent that's focused in herdr.
+- **One row per agent** in the menu, with its state dot, title and folder. A checkmark marks the agent that's focused in herdr.
 - **Click to focus**: clicking an agent switches herdr to it and brings Ghostty to the front.
 - **Notifications** when an agent gets blocked or finishes. Clicking one does the same as clicking the agent in the menu. You don't get one for the agent you're already looking at.
 - **Launch at login**, from a toggle in the menu.

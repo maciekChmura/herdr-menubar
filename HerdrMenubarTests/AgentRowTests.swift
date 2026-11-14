@@ -29,23 +29,23 @@ struct AgentRowTests {
         let rows = AgentRow.rows(for: agents)
 
         #expect(rows.map(\.id) == ["w1:p6", "w1:p9", "w1:pB", "w1:pA"])
-        #expect(rows.map(\.text) == [
-            "🟢 Example task 1 — project-a",
-            "🟢 Example task 2 — project-b",
-            "🟢 Example task 4 — project-d",
-            "⚪ Example task 3 — project-c",
+        #expect(rows.map(\.title) == [
+            "Example task 1 — project-a",
+            "Example task 2 — project-b",
+            "Example task 4 — project-d",
+            "Example task 3 — project-c",
         ])
         #expect(rows.map(\.agent.focused) == [false, false, true, false])
     }
 
-    @Test func showsGlyphTitleAndFolder() {
+    @Test func showsTitleAndFolder() {
         let row = AgentRow(agent: agent("p1", .blocked, title: "Fix login tests", folder: "project-a"))
-        #expect(row.text == "🔴 Fix login tests — project-a")
+        #expect(row.title == "Fix login tests — project-a")
     }
 
     @Test func fallsBackToTheAgentTypeWhenThereIsNoTitle() {
         let row = AgentRow(agent: agent("p1", .done, title: nil, folder: "project-a"))
-        #expect(row.text == "🔵 claude — project-a")
+        #expect(row.title == "claude — project-a")
     }
 
     @Test func takesTheFolderFromCwdWhenThereIsNoForegroundCwd() {
@@ -54,12 +54,12 @@ struct AgentRowTests {
             agentStatus: .idle, focused: false, cwd: "/Users/me/dev/fallback", foregroundCwd: nil,
             terminalTitleStripped: "Task"
         )
-        #expect(AgentRow(agent: fromCwd).text == "⚪ Task — fallback")
+        #expect(AgentRow(agent: fromCwd).title == "Task — fallback")
     }
 
     @Test func leavesOutTheFolderWhenThereIsNoDirectory() {
         let row = AgentRow(agent: agent("p1", .idle, title: "Task", folder: nil))
-        #expect(row.text == "⚪ Task")
+        #expect(row.title == "Task")
     }
 
     @Test(arguments: [(0, "No agents"), (1, "1 agent"), (4, "4 agents")])

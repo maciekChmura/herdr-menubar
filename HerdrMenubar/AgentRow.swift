@@ -6,11 +6,10 @@ struct AgentRow: Identifiable, Equatable {
 
     var id: String { agent.paneId }
 
-    /// The state glyph, the title and the folder, such as "🔴 Fix login tests — project-a".
-    var text: String {
-        let glyphAndTitle = "\(agent.agentStatus.glyph) \(agent.displayTitle)"
-        guard let folder = agent.folderName else { return glyphAndTitle }
-        return "\(glyphAndTitle) — \(folder)"
+    /// The title and the folder, such as "Fix login tests — project-a". The state is shown as a dot next to it.
+    var title: String {
+        guard let folder = agent.folderName else { return agent.displayTitle }
+        return "\(agent.displayTitle) — \(folder)"
     }
 
     /// Rows sorted by state in display order, then by folder name.

@@ -45,17 +45,17 @@ If milestone M2 finds that `pane.updated` fires too often to be useful, drop it 
 
 ## States
 
-| State | Meaning | Glyph |
+| State | Meaning | Dot |
 | --- | --- | --- |
-| `blocked` | herdr recognized an approval or question prompt. The agent is waiting for the user. | 🔴 |
-| `working` | The agent is busy. | 🟢 |
-| `done` | The agent finished and hasn't been seen yet. It turns `idle` once it's focused through herdr. | 🔵 |
-| `idle` | The agent is ready for input and has already been seen. | ⚪ |
-| `unknown` | An agent is present, but herdr can't classify its state. | ⚫ |
+| `blocked` | herdr recognized an approval or question prompt. The agent is waiting for the user. | Red |
+| `working` | The agent is busy. | Green |
+| `done` | The agent finished and hasn't been seen yet. It turns `idle` once it's focused through herdr. | Blue |
+| `idle` | The agent is ready for input and has already been seen. | Gray |
+| `unknown` | An agent is present, but herdr can't classify its state. | Gray ring |
 
 Any status string this app doesn't recognize is treated as `unknown`, so a newer herdr can't break decoding.
 
-Every glyph is a dot, so the same legend works for counts and for one dot per agent.
+Every state is shown as a small dot, 8 points across, drawn by the app in the system colors (`systemRed`, `systemGreen`, `systemBlue`, `systemGray`). The same dots appear in the menu bar and in front of each row in the dropdown. Emoji aren't used: they're drawn at text size with their own shading. The dots are non-template images, so the menu bar keeps their colors.
 
 This order (blocked, working, done, idle, unknown) is used for the counts in the menu bar and for sorting the dropdown.
 
@@ -63,8 +63,8 @@ This order (blocked, working, done, idle, unknown) is used for the counts in the
 
 The user picks one of two styles under "Menu bar shows" in the menu. The choice is remembered across launches.
 
-- **Counts per state** (the default): one count for each state, in the order above, with zero counts left out. Example: `🔴1 🟢2 🔵3 ⚪1`.
-- **One dot per agent**: one glyph per agent, in the order herdr lists the agents. Each agent keeps its place, and only its color changes when its state changes. Example: `🟢🔴🟢🔵⚪`.
+- **Counts per state** (the default): a dot and its count for each state, in the order above, with zero counts left out, such as "● 1  ● 3  ● 2". The numbers use the system text color, resolved when the menu bar draws them, so they match the menu bar even when the menu bar is light and the menu is dark.
+- **One dot per agent**: one dot per agent, in the order herdr lists the agents. Each agent keeps its place, and only its color changes when its state changes.
 
 In both styles:
 
@@ -77,7 +77,7 @@ Use `MenuBarExtra` with `.menuBarExtraStyle(.menu)`, which gives the standard na
 
 1. **Header**: a disabled item with the agent count, such as "4 agents".
 2. **Agent rows**: one item per agent, sorted by state in the order above, then by folder name. Each row shows:
-   - the state glyph;
+   - the state dot, as the item's icon;
    - the title: `terminal_title_stripped`, or `agent` when the title is empty;
    - the folder: the last path component of `foreground_cwd`, falling back to `cwd`.
 
@@ -193,7 +193,7 @@ Done when:
 ### M7: One dot per agent
 
 - [x] A "Menu bar shows" choice in the menu between counts per state and one dot per agent, remembered across launches.
-- [x] Done is 🔵 and unknown is ⚫ everywhere, so every state is a dot.
+- [x] Every state is a dot (done is blue, unknown a gray ring), drawn by the app in the menu bar and in the dropdown rows instead of emoji.
 
 Done when:
 - The dots are unit-tested, including that a dot keeps its place when its agent changes state.
