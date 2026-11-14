@@ -33,6 +33,12 @@ struct HerdrClient: Sendable {
         return result.agents
     }
 
+    /// Focuses an agent in herdr, which also marks a `done` agent as seen.
+    /// `target` can be a pane ID or an agent name.
+    func focusAgent(_ target: String) async throws {
+        let _: IgnoredResult = try await request("agent.focus", params: AgentTarget(target: target))
+    }
+
     func request<Result: Decodable>(_ method: String) async throws -> Result {
         try await request(method, params: EmptyParams())
     }
@@ -190,6 +196,15 @@ private final class SubscriptionConnection: @unchecked Sendable {
 }
 
 struct EmptyParams: Encodable {}
+
+private struct AgentTarget: Encodable {
+    let target: String
+}
+
+/// Accepts any `result`, for requests where only success or failure matters.
+private struct IgnoredResult: Decodable {
+    init(from decoder: any Decoder) throws {}
+}
 
 private struct SubscribeParams: Encodable {
     let subscriptions: [Subscription]

@@ -31,11 +31,12 @@ The repo is public, so the examples were anonymized: paths, terminal titles, tab
 - **Several events can arrive at once**: when two agents in the same tab went from `done` to `idle` together, both events arrived in the same instant.
 - **No heartbeat**: while nothing changes, the subscription stays silent and open. In one stretch, more than 9 minutes passed between events.
 - **Event names don't always match subscription types**: subscribing to `pane.focused`, `tab.focused` or `workspace.focused` delivers events named `pane_focused`, `tab_focused` and `workspace_focused`, with an extra `type` field in `data`. Status events keep the dotted name `pane.agent_status_changed`.
-- **`done` can turn `idle` without any focus event**: the two agents that went `done` to `idle` together did so with no `*_focused` event before them.
+- **`done` can turn `idle` without any focus event**: the two agents that went `done` to `idle` together did so with no `*_focused` event before them. Switching to a `done` agent in the herdr TUI turns it `idle`, with `pane_focused` and `pane.agent_status_changed` arriving together.
+- **`agent.focus` and `agent.get` accept a pane ID as `target`**, for example `{"target": "w1:p6"}`. herdr switches the TUI to that pane and sends `pane_focused` about 10 ms later. Focusing the pane that's already focused succeeds and sends no event. An unknown target returns the error `agent_not_found`.
 
 ## Not yet verified
 
-- **`agent.focus` target**: the CLI accepts an agent name. It hasn't been tested whether the API also accepts a `pane_id` as `target`.
+- **That `agent.focus` turns a `done` agent `idle`**: herdr's guide says explicit focus commands mark an agent as seen, but no `done` agent has been focused through the API yet.
 
 Whoever verifies one of these should move it to the section above.
 

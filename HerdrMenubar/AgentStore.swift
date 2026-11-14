@@ -26,7 +26,8 @@ final class AgentStore {
     }
 
     /// Pane events that take no parameters. Status changes are added per pane.
-    static let paneEvents = ["pane.created", "pane.closed", "pane.exited", "pane.agent_detected", "pane.updated"]
+    /// `pane.focused` keeps the checkmark on the focused agent current: switching panes changes no agent's state.
+    static let paneEvents = ["pane.created", "pane.closed", "pane.exited", "pane.agent_detected", "pane.updated", "pane.focused"]
 
     static func subscriptions(forPanes panes: Set<String>) -> [Subscription] {
         paneEvents.map { Subscription(type: $0) }
@@ -54,6 +55,19 @@ final class AgentStore {
     func stop() {
         syncTask?.cancel()
         syncTask = nil
+    }
+
+    /// Focuses `agent` in herdr. Returns false and logs the error if herdr refused or couldn't be reached.
+    /// The resulting focus and status events update `state`.
+    func focus(_ agent: Agent) async -> Bool {
+        do {
+            try await client.focusAgent(agent.paneId)
+            log.info("Focused the agent in pane \(agent.paneId, privacy: .public)")
+            return true
+        } catch {
+            log.error("Couldn't focus the agent in pane \(agent.paneId, privacy: .public): \(String(describing: error), privacy: .public)")
+            return false
+        }
     }
 
     private func syncUntilCancelled() async {

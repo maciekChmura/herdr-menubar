@@ -36,7 +36,7 @@ The parts that shape the design:
 ### Keeping state in sync
 
 1. `agent.list` is the source of truth for which agents exist and what state they're in.
-2. Open one subscription for `pane.created`, `pane.closed`, `pane.exited`, `pane.agent_detected` and `pane.updated`, plus one `pane.agent_status_changed` for each known agent pane.
+2. Open one subscription for `pane.created`, `pane.closed`, `pane.exited`, `pane.agent_detected`, `pane.updated` and `pane.focused`, plus one `pane.agent_status_changed` for each known agent pane. `pane.focused` keeps the checkmark on the focused agent current, because switching panes changes no agent's state.
 3. On any event, fetch `agent.list` again, debounced by about 100 ms. If the set of agent panes changed, reopen the subscription with the new list of panes.
 4. As a safety net, fetch `agent.list` every 30 seconds while connected, in case an event was missed. This is a fallback, not the update mechanism.
 5. If the subscription connection drops (the server restarted, or `herdr update --handoff` ran), reconnect with backoff: 1 s, 2 s, 4 s and so on, capped at 30 s.
@@ -159,7 +159,7 @@ Done when:
 
 ### M4: Click to focus
 
-- [ ] `agent.focus`, then bring Ghostty to the front.
+- [x] `agent.focus`, then bring Ghostty to the front.
 
 Done when:
 - Clicking a row switches the herdr TUI to that agent and brings Ghostty to the front.

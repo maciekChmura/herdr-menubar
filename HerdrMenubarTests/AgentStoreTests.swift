@@ -25,7 +25,7 @@ struct AgentStoreTests {
 
         let subscribe = try #require(herdr.server.requests(method: "events.subscribe").first)
         #expect(subscriptionKeys(subscribe) == [
-            "pane.created", "pane.closed", "pane.exited", "pane.agent_detected", "pane.updated",
+            "pane.created", "pane.closed", "pane.exited", "pane.agent_detected", "pane.updated", "pane.focused",
             "pane.agent_status_changed w1:p1", "pane.agent_status_changed w1:p2",
         ])
     }
@@ -97,6 +97,37 @@ struct AgentStoreTests {
         try await eventually("recovered") { statuses(store) == [.done] }
     }
 
+    @Test func focusSendsThePaneIDAsTheTarget() async throws {
+        let herdr = try FakeHerdrWithAgents([("w1:p1", "done")])
+        defer { herdr.server.stop() }
+        let store = AgentStore(client: HerdrClient(socketPath: herdr.server.path), timing: Self.timing)
+
+        #expect(await store.focus(agent(pane: "w1:p1")))
+
+        let request = try #require(herdr.server.requests(method: "agent.focus").first)
+        #expect((request["params"] as? [String: String]) == ["target": "w1:p1"])
+    }
+
+    @Test func focusReportsFailureWhenHerdrRefuses() async throws {
+        let herdr = try FakeHerdrWithAgents([("w1:p1", "done")])
+        defer { herdr.server.stop() }
+        let store = AgentStore(client: HerdrClient(socketPath: herdr.server.path), timing: Self.timing)
+
+        #expect(await store.focus(agent(pane: "w1:gone")) == false)
+    }
+
+    @Test func focusReportsFailureWhenHerdrIsNotRunning() async {
+        let store = AgentStore(client: HerdrClient(socketPath: FakeHerdrServer.temporarySocketPath()), timing: Self.timing)
+        #expect(await store.focus(agent(pane: "w1:p1")) == false)
+    }
+
+    private func agent(pane: String) -> Agent {
+        Agent(
+            paneId: pane, workspaceId: "w1", tabId: "w1:t1", agent: "claude", name: nil,
+            agentStatus: .done, focused: false, cwd: nil, foregroundCwd: nil, terminalTitleStripped: nil
+        )
+    }
+
     private func statuses(_ store: AgentStore) -> [AgentStatus]? {
         guard case .loaded(let agents) = store.state else { return nil }
         return agents.map(\.agentStatus)
@@ -129,6 +160,13 @@ final class FakeHerdrWithAgents: @unchecked Sendable {
                 return .reply(FakeHerdr.agentList(id: id, self.agents))
             case "events.subscribe":
                 return .replyAndHold(FakeHerdr.subscriptionStarted(id: id))
+            case "agent.focus":
+                // Like herdr: an unknown target is an error.
+                let target = (request["params"] as? [String: Any])?["target"] as? String
+                guard self.agents.contains(where: { $0.pane == target }) else {
+                    return .reply(FakeHerdr.error(id: id, code: "agent_not_found", message: "agent target not found"))
+                }
+                return .reply(#"{"id":"\#(id)","result":{"type":"ok"}}"#)
             default:
                 return .reply(FakeHerdr.error(id: id, code: "unknown_method", message: "not faked"))
             }

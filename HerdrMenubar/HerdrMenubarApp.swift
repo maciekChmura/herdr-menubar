@@ -12,8 +12,15 @@ struct HerdrMenubarApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            // M4 focuses the selected agent.
-            AgentMenu(state: store.state, onSelect: { _ in })
+            AgentMenu(state: store.state, onSelect: { agent in
+                Task {
+                    if await store.focus(agent) {
+                        TerminalApp.activate()
+                    } else {
+                        NSSound.beep()
+                    }
+                }
+            })
             Divider()
             Button("Quit") {
                 NSApplication.shared.terminate(nil)
