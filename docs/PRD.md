@@ -55,7 +55,7 @@ If milestone M2 finds that `pane.updated` fires too often to be useful, drop it 
 
 Any status string this app doesn't recognize is treated as `unknown`, so a newer herdr can't break decoding.
 
-Every state is shown as a small dot (10 points across in the menu bar, 8 in front of the menu rows), drawn by the app in the system colors (`systemRed`, `systemGreen`, `systemBlue`, `systemGray`). The same dots appear in the menu bar and in front of each row in the dropdown. Emoji aren't used: they're drawn at text size with their own shading. The dots are non-template images, so the menu bar keeps their colors.
+Every state is shown as a small dot, 10 points across, drawn by the app in the system colors (`systemRed`, `systemGreen`, `systemBlue`, `systemGray`). The same dots appear in the menu bar and in front of each row in the dropdown. Emoji aren't used: they're drawn at text size with their own shading. The dots are non-template images, so the menu bar keeps their colors.
 
 This order (blocked, working, done, idle, unknown) is used for the counts in the menu bar and for sorting the dropdown.
 

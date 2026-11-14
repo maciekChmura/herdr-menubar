@@ -3,11 +3,9 @@ import AppKit
 /// Draws one small colored dot per agent for the menu bar, like the status dots in other Mac apps.
 /// Emoji can't do this: they're drawn at text size with their own shading.
 enum DotsImage {
-    /// Dots in the menu bar.
+    /// The same size in the menu bar and in front of the menu rows.
     static let diameter: CGFloat = 10
     static let spacing: CGFloat = 4
-    /// Dots in front of the rows in the menu, smaller so they don't crowd the text.
-    static let menuDiameter: CGFloat = 8
     /// Tall enough to center the dots in the menu bar.
     static let height: CGFloat = 16
 
@@ -95,9 +93,9 @@ enum DotsImage {
 
     /// The dot shown before an agent's title in the menu.
     static func menuIcon(for status: AgentStatus) -> NSImage {
-        let size = NSSize(width: menuDiameter + 2, height: menuDiameter + 2)
+        let size = NSSize(width: diameter + 2, height: diameter + 2)
         let image = NSImage(size: size, flipped: false) { _ in
-            draw(style(for: status), in: NSRect(x: 1, y: 1, width: menuDiameter, height: menuDiameter))
+            draw(style(for: status), in: NSRect(x: 1, y: 1, width: diameter, height: diameter))
             return true
         }
         image.isTemplate = false
