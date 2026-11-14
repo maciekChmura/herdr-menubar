@@ -3,23 +3,33 @@ import SwiftUI
 @main
 struct HerdrMenubarApp: App {
     @State private var store: AgentStore
+    @State private var notifier: Notifier
 
     init() {
         let store = AgentStore(client: HerdrClient(socketPath: HerdrClient.resolveSocketPath()))
+        let notifier = Notifier()
         _store = State(initialValue: store)
+        _notifier = State(initialValue: notifier)
+        guard !Self.isTestHost else { return }
+
+        store.onAlerts = { alerts in
+            let terminalIsFrontmost = TerminalApp.isFrontmost
+            for alert in alerts where alert.shouldPost(terminalIsFrontmost: terminalIsFrontmost) {
+                notifier.post(alert)
+            }
+        }
+        // Clicking a notification does the same as clicking the agent's row.
+        notifier.onOpen = { paneId in
+            Task { await Self.focus(paneId: paneId, store: store) }
+        }
+        notifier.requestAuthorization()
         store.start()
     }
 
     var body: some Scene {
         MenuBarExtra {
             AgentMenu(state: store.state, onSelect: { agent in
-                Task {
-                    if await store.focus(agent) {
-                        TerminalApp.activate()
-                    } else {
-                        NSSound.beep()
-                    }
-                }
+                Task { await Self.focus(paneId: agent.paneId, store: store) }
             })
             Divider()
             Button("Quit") {
@@ -30,6 +40,23 @@ struct HerdrMenubarApp: App {
             MenuBarLabelView(label: MenuBarLabel(store.state))
         }
         .menuBarExtraStyle(.menu)
+    }
+
+    /// True when the app was launched as the host for unit tests. Then it must not talk to the real herdr
+    /// or ask for notification permission: the test run quits it seconds later, and macOS records the
+    /// dismissed permission prompt as "not allowed".
+    private static var isTestHost: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
+
+    /// Focuses the agent in herdr and brings the terminal to the front, or beeps if herdr refused.
+    @MainActor
+    private static func focus(paneId: String, store: AgentStore) async {
+        if await store.focus(paneId: paneId) {
+            TerminalApp.activate()
+        } else {
+            NSSound.beep()
+        }
     }
 }
 

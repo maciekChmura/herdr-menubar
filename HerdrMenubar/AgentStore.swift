@@ -39,6 +39,11 @@ final class AgentStore {
     private let timing: Timing
     @ObservationIgnored private var syncTask: Task<Void, Never>?
     @ObservationIgnored private var sessionSubscribed = false
+    /// True until the first fetch after launch or after a lost connection: that fetch only sets the baseline
+    /// for alerts, so states that were already there, or changed while disconnected, don't notify.
+    @ObservationIgnored private var needsBaseline = true
+    /// Called with the alerts from each fetch that has any. See `AgentAlert`.
+    @ObservationIgnored var onAlerts: (([AgentAlert]) -> Void)?
     private let log = Logger(subsystem: "io.github.maciekchmura.HerdrMenubar", category: "herdr")
 
     init(client: HerdrClient, timing: Timing = Timing()) {
@@ -57,15 +62,15 @@ final class AgentStore {
         syncTask = nil
     }
 
-    /// Focuses `agent` in herdr. Returns false and logs the error if herdr refused or couldn't be reached.
-    /// The resulting focus and status events update `state`.
-    func focus(_ agent: Agent) async -> Bool {
+    /// Focuses the agent in `paneId` in herdr. Returns false and logs the error if herdr refused or
+    /// couldn't be reached. The resulting focus and status events update `state`.
+    func focus(paneId: String) async -> Bool {
         do {
-            try await client.focusAgent(agent.paneId)
-            log.info("Focused the agent in pane \(agent.paneId, privacy: .public)")
+            try await client.focusAgent(paneId)
+            log.info("Focused the agent in pane \(paneId, privacy: .public)")
             return true
         } catch {
-            log.error("Couldn't focus the agent in pane \(agent.paneId, privacy: .public): \(String(describing: error), privacy: .public)")
+            log.error("Couldn't focus the agent in pane \(paneId, privacy: .public): \(String(describing: error), privacy: .public)")
             return false
         }
     }
@@ -82,12 +87,14 @@ final class AgentStore {
             } catch is CancellationError {
                 return
             } catch HerdrError.notRunning {
+                needsBaseline = true
                 if state != .notRunning {
                     log.info("herdr server is not running at \(self.client.socketPath, privacy: .public)")
                 }
                 state = .notRunning
             } catch {
                 log.error("Lost the herdr connection: \(String(describing: error), privacy: .public)")
+                needsBaseline = true
                 // Keep showing the last agents we had; the next attempt corrects them.
                 if case .loaded = state {} else { state = .failed(String(describing: error)) }
             }
@@ -101,7 +108,8 @@ final class AgentStore {
     /// Lists the agents, subscribes to their events, and refetches on every event until the
     /// subscription drops (throws) or the set of agent panes changes (returns).
     private func runSession() async throws {
-        apply(try await client.listAgents())
+        apply(try await client.listAgents(), isBaseline: needsBaseline)
+        needsBaseline = false
         guard case .loaded(let agents) = state else { return }
         let panes = Set(agents.map(\.paneId))
 
@@ -145,9 +153,15 @@ final class AgentStore {
         }
     }
 
-    private func apply(_ agents: [Agent]) {
-        guard state != .loaded(agents) else { return }
-        state = .loaded(agents)
-        log.info("Agents: \(MenuBarLabel.counts(of: agents), privacy: .public)")
+    private func apply(_ agents: [Agent], isBaseline: Bool = false) {
+        var previous: [Agent]?
+        if !isBaseline, case .loaded(let current) = state { previous = current }
+        let alerts = AgentAlert.alerts(previous: previous, current: agents)
+
+        if state != .loaded(agents) {
+            state = .loaded(agents)
+            log.info("Agents: \(MenuBarLabel.counts(of: agents), privacy: .public)")
+        }
+        if !alerts.isEmpty { onAlerts?(alerts) }
     }
 }

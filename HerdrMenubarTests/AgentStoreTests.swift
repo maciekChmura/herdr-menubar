@@ -102,7 +102,7 @@ struct AgentStoreTests {
         defer { herdr.server.stop() }
         let store = AgentStore(client: HerdrClient(socketPath: herdr.server.path), timing: Self.timing)
 
-        #expect(await store.focus(agent(pane: "w1:p1")))
+        #expect(await store.focus(paneId: "w1:p1"))
 
         let request = try #require(herdr.server.requests(method: "agent.focus").first)
         #expect((request["params"] as? [String: String]) == ["target": "w1:p1"])
@@ -113,19 +113,63 @@ struct AgentStoreTests {
         defer { herdr.server.stop() }
         let store = AgentStore(client: HerdrClient(socketPath: herdr.server.path), timing: Self.timing)
 
-        #expect(await store.focus(agent(pane: "w1:gone")) == false)
+        #expect(await store.focus(paneId: "w1:gone") == false)
     }
 
     @Test func focusReportsFailureWhenHerdrIsNotRunning() async {
         let store = AgentStore(client: HerdrClient(socketPath: FakeHerdrServer.temporarySocketPath()), timing: Self.timing)
-        #expect(await store.focus(agent(pane: "w1:p1")) == false)
+        #expect(await store.focus(paneId: "w1:p1") == false)
     }
 
-    private func agent(pane: String) -> Agent {
-        Agent(
-            paneId: pane, workspaceId: "w1", tabId: "w1:t1", agent: "claude", name: nil,
-            agentStatus: .done, focused: false, cwd: nil, foregroundCwd: nil, terminalTitleStripped: nil
-        )
+    @Test func alertsOnceWhenAnAgentFinishesButNotForStatesAtLaunch() async throws {
+        let herdr = try FakeHerdrWithAgents([("w1:p1", "working"), ("w1:p2", "done")])
+        let store = AgentStore(client: HerdrClient(socketPath: herdr.server.path), timing: Self.timing)
+        let received = AlertLog()
+        store.onAlerts = { received.alerts += $0 }
+        store.start()
+        defer { store.stop(); herdr.server.stop() }
+
+        try await eventually("settled after subscribing") {
+            herdr.server.heldConnectionCount == 1 && herdr.server.requests(method: "agent.list").count == 2
+        }
+        #expect(received.alerts.isEmpty, "An agent that was already done at launch doesn't notify")
+
+        herdr.agents = [("w1:p1", "done"), ("w1:p2", "done")]
+        herdr.server.push(FakeHerdr.event("pane.agent_status_changed", pane: "w1:p1"))
+        try await eventually("alerted") { !received.alerts.isEmpty }
+
+        // Another event without a change must not repeat the alert.
+        herdr.server.push(FakeHerdr.event("pane.focused", pane: "w1:p1"))
+        try await eventually("refetched") { herdr.server.requests(method: "agent.list").count == 4 }
+        #expect(received.alerts.map(\.agent.paneId) == ["w1:p1"])
+        #expect(received.alerts.map(\.kind) == [.done])
+    }
+
+    @Test func doesNotAlertForChangesMadeWhileDisconnected() async throws {
+        let herdr = try FakeHerdrWithAgents([("w1:p1", "working")])
+        let store = AgentStore(client: HerdrClient(socketPath: herdr.server.path), timing: Self.timing)
+        let received = AlertLog()
+        store.onAlerts = { received.alerts += $0 }
+        store.start()
+        defer { store.stop(); herdr.server.stop() }
+
+        try await eventually("settled after subscribing") {
+            herdr.server.heldConnectionCount == 1 && herdr.server.requests(method: "agent.list").count == 2
+        }
+
+        herdr.agents = [("w1:p1", "done")]
+        herdr.server.dropHeldConnections()
+        try await eventually("reconnected and settled") {
+            herdr.server.heldConnectionCount == 1 && herdr.server.requests(method: "agent.list").count == 4
+        }
+        #expect(received.alerts.isEmpty, "The first fetch after a reconnect only sets the baseline")
+        #expect(statuses(store) == [.done])
+
+        // Changes after the reconnect notify again.
+        herdr.agents = [("w1:p1", "blocked")]
+        herdr.server.push(FakeHerdr.event("pane.agent_status_changed", pane: "w1:p1"))
+        try await eventually("alerted") { !received.alerts.isEmpty }
+        #expect(received.alerts.map(\.kind) == [.blocked])
     }
 
     private func statuses(_ store: AgentStore) -> [AgentStatus]? {
@@ -172,6 +216,11 @@ final class FakeHerdrWithAgents: @unchecked Sendable {
             }
         }
     }
+}
+
+@MainActor
+final class AlertLog {
+    var alerts: [AgentAlert] = []
 }
 
 struct ConditionTimedOut: Error, CustomStringConvertible {

@@ -168,7 +168,7 @@ Done when:
 
 ### M5: Notifications
 
-- [ ] Change detection, the permission request, clicking a notification, and skipping notifications for the agent the user is already looking at, as described in "Notifications".
+- [x] Change detection, the permission request, clicking a notification, and skipping notifications for the agent the user is already looking at, as described in "Notifications".
 
 Done when:
 - Change detection is unit-tested, including "no notifications at launch".

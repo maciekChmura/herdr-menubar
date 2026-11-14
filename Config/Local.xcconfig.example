@@ -1,0 +1,8 @@
+// Optional. Copy this file to Config/Local.xcconfig (gitignored) and fill in your team ID to sign builds
+// with your Apple Development certificate instead of ad hoc. That keeps the app's signature the same
+// across builds; an ad-hoc signature changes with every build.
+// Your team ID is the OU field of your certificate, not the ID in parentheses in its name:
+//   security find-certificate -c "Apple Development" -p | openssl x509 -noout -subject
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = Apple Development
+DEVELOPMENT_TEAM = YOURTEAMID

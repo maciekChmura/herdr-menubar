@@ -28,3 +28,6 @@ build/
 # Swift Package Manager
 .build/
 .swiftpm/
+
+# Local signing settings (your Apple team ID). See Config/Local.xcconfig.example.
+Config/Local.xcconfig

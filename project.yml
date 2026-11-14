@@ -6,14 +6,16 @@ options:
     macOS: "14.0"
   createIntermediateGroups: true
 
+# Code signing lives in Config/Signing.xcconfig: ad-hoc by default, or your own certificate via the
+# gitignored Config/Local.xcconfig.
+configFiles:
+  Debug: Config/Signing.xcconfig
+  Release: Config/Signing.xcconfig
+
 settings:
   base:
     SWIFT_VERSION: "6.0"
     MACOSX_DEPLOYMENT_TARGET: "14.0"
-    # Ad-hoc signing ("Sign to Run Locally"): no Apple developer team needed.
-    CODE_SIGN_STYLE: Manual
-    CODE_SIGN_IDENTITY: "-"
-    DEVELOPMENT_TEAM: ""
 
 targets:
   HerdrMenubar:
