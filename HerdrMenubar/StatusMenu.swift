@@ -9,12 +9,23 @@ enum StatusMenu {
         var animationOn: Bool
         var launchAtLoginTitle: String
         var launchAtLoginOn: Bool
+        var checkForUpdatesOn: Bool
+        /// A newer release to offer at the top of the menu.
+        var update: UpdateChecker.Update?
     }
 
-    /// The menu's items. Agent rows carry their pane ID as `representedObject`, and so do the
-    /// "Menu bar shows" choices with the style's raw value. Actions go to `target`.
+    /// The menu's items. Agent rows carry their pane ID as `representedObject`, the "Menu bar shows"
+    /// choices the style's raw value, and the update item the release page's URL. Actions go to `target`.
     static func items(for state: AgentStore.State, settings: Settings, target: AnyObject?) -> [NSMenuItem] {
         var items: [NSMenuItem] = []
+
+        if let update = settings.update {
+            let item = NSMenuItem(title: "Update available: \(update.version)…", action: #selector(StatusItemController.openUpdate(_:)), keyEquivalent: "")
+            item.target = target
+            item.representedObject = update.url
+            items.append(item)
+            items.append(.separator())
+        }
 
         switch state {
         case .loading:
@@ -67,6 +78,11 @@ enum StatusMenu {
         launch.target = target
         launch.state = settings.launchAtLoginOn ? .on : .off
         items.append(launch)
+
+        let updates = NSMenuItem(title: "Check for updates", action: #selector(StatusItemController.toggleCheckForUpdates(_:)), keyEquivalent: "")
+        updates.target = target
+        updates.state = settings.checkForUpdatesOn ? .on : .off
+        items.append(updates)
 
         let quit = NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         quit.target = NSApp

@@ -15,8 +15,8 @@ A native macOS menu bar app that shows the live state of the AI coding agents ru
 - No remote machines: only the herdr server on this Mac, not machines saved in `herdr machine` or reached over SSH.
 - No starting or stopping agents, and no managing workspaces, tabs or panes.
 - No changes to herdr's configuration, and no replacing herdr's own notifications.
-- No App Store, sandboxing or auto-update.
-- No settings window. The only settings are in the menu: what the menu bar shows, "Animate dots" and "Launch at login".
+- No App Store, no sandboxing, and no installing updates: the app only says when a newer release is out (see "Update check").
+- No settings window. The only settings are in the menu: what the menu bar shows, "Animate dots", "Launch at login" and "Check for updates".
 
 ## User
 
@@ -91,14 +91,15 @@ The animations are Core Animation animations that macOS plays outside the app, s
 
 An AppKit `NSMenu`, rebuilt each time it opens, and updated while it's open when the agents change.
 
-1. **Header**: a disabled item with the agent count, such as "4 agents".
-2. **Agent rows**: one item per agent, in the same order as the menu bar. In dots mode that's herdr's order, so the 2nd dot is the 2nd row. In counts mode the rows are sorted by state in the order above, like the counts, then by folder name. Each row shows:
+1. **Update** (added in M9): only when a newer release is out, "Update available: 0.2.0…" followed by a separator. See "Update check".
+2. **Header**: a disabled item with the agent count, such as "4 agents".
+3. **Agent rows**: one item per agent, in the same order as the menu bar. In dots mode that's herdr's order, so the 2nd dot is the 2nd row. In counts mode the rows are sorted by state in the order above, like the counts, then by folder name. Each row shows:
    - the state dot, as the item's icon;
    - the title: `terminal_title_stripped`, or `agent` when the title is empty;
    - the folder: the last path component of `foreground_cwd`, falling back to `cwd`.
 
    Mark the agent whose `focused` is `true`, for example with a checkmark.
-3. **Footer**: the "Menu bar shows" choice (added in M7), an "Animate dots" toggle (added in M8), a "Launch at login" toggle (added in M6) and "Quit".
+4. **Footer**: the "Menu bar shows" choice (added in M7), an "Animate dots" toggle (added in M8), a "Launch at login" toggle (added in M6), a "Check for updates" toggle (added in M9) and "Quit".
 
 When the herdr server isn't reachable, replace the rows with one disabled item: "herdr server is not running". Add a second disabled line below it: "Start it by running `herdr`".
 
@@ -119,6 +120,18 @@ Focusing an agent marks it as seen, so a `done` agent turns `idle`. This is expe
 - Skip the notification when that agent is `focused` and Ghostty is the frontmost app. The user is already looking at it.
 - Ask for notification permission on first launch.
 - herdr's TUI may show its own notifications too. Duplicates are acceptable in v1.
+
+## Update check
+
+The app is distributed as a disk image on the GitHub releases page. It tells the user when a newer one is out, and leaves downloading and installing to them.
+
+- At launch, and then every 24 hours, fetch `https://api.github.com/repos/maciekChmura/herdr-menubar/releases/latest`. GitHub leaves drafts and pre-releases out of it.
+- Compare the release's `tag_name`, such as `v0.2.0`, with the app's `CFBundleShortVersionString`, number by number, so 0.10.0 is newer than 0.9.0. Ignore tags that aren't plain numbers, such as `v0.3.0-beta`.
+- When the release is newer, the menu offers it at the top (see "Dropdown"). Clicking it opens the release page, the reply's `html_url`, in the browser. Only `https://github.com/` URLs are opened.
+- A 404 means the repo has no releases yet; that's not an error. When the check fails, for example offline, try again in an hour. Failures are logged and never shown.
+- This is the app's only connection to the internet, so the "Check for updates" toggle in the menu turns it off. It's on by default and remembered across launches. Turning it off also hides an update the menu was offering.
+- No notification: the menu item is enough, since the menu is opened often to switch agents.
+- For testing, the `UpdateCheckURL` setting replaces the URL above, for example with another repo's `releases/latest`.
 
 ## Platform and technical decisions
 
@@ -225,3 +238,13 @@ Done when:
 - The animations are unit-tested: their timing, which dots get which animation, and that the first show neither fades nor pops.
 - With agents working, the app uses close to 0% CPU.
 - The menu still works as before: agent rows with dots and the checkmark, clicking an agent, the "Menu bar shows" choice, and both toggles.
+
+### M9: Update check
+
+- [x] A check for a newer GitHub release at launch and every 24 hours, as described in "Update check".
+- [x] "Update available: <version>…" at the top of the menu, opening the release page, and a "Check for updates" toggle, remembered across launches.
+
+Done when:
+- Comparing versions and reading GitHub's reply are unit-tested, including tags that aren't plain numbers, a repo with no releases, and a failed check.
+- Pointed at a repo whose latest release is newer, the menu offers it, and clicking it opens the release page.
+- With "Check for updates" off, the app sends no request to GitHub.

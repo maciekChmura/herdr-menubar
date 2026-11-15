@@ -9,7 +9,8 @@ struct StatusMenuTests {
         animationTitle: "Animate dots",
         animationOn: true,
         launchAtLoginTitle: "Launch at login",
-        launchAtLoginOn: false
+        launchAtLoginOn: false,
+        checkForUpdatesOn: true
     )
 
     @Test func listsAgentsUnderAHeaderWithTheFocusedOneChecked() throws {
@@ -44,7 +45,7 @@ struct StatusMenuTests {
 
     @Test func showsTheSettingsAndQuitAfterTheAgents() throws {
         let items = StatusMenu.items(for: .loaded([agent("w1:p1", .idle)]), settings: settings, target: nil)
-        let tail = Array(items.suffix(5))
+        let tail = Array(items.suffix(6))
 
         #expect(tail[0].isSeparatorItem)
         #expect(tail[1].title == "Menu bar shows")
@@ -56,8 +57,29 @@ struct StatusMenuTests {
         #expect(tail[2].state == .on)
         #expect(tail[3].title == "Launch at login")
         #expect(tail[3].state == .off)
-        #expect(tail[4].title == "Quit")
-        #expect(tail[4].keyEquivalent == "q")
+        #expect(tail[4].title == "Check for updates")
+        #expect(tail[4].state == .on)
+        #expect(tail[4].action == #selector(StatusItemController.toggleCheckForUpdates(_:)))
+        #expect(tail[5].title == "Quit")
+        #expect(tail[5].keyEquivalent == "q")
+    }
+
+    @Test func offersAnUpdateAtTheTop() throws {
+        var withUpdate = settings
+        let page = try #require(URL(string: "https://github.com/maciekChmura/herdr-menubar/releases/tag/v0.2.0"))
+        withUpdate.update = UpdateChecker.Update(version: "0.2.0", url: page)
+        let items = StatusMenu.items(for: .notRunning, settings: withUpdate, target: nil)
+
+        #expect(items[0].title == "Update available: 0.2.0…")
+        #expect(items[0].action == #selector(StatusItemController.openUpdate(_:)))
+        #expect(items[0].representedObject as? URL == page)
+        #expect(items[1].isSeparatorItem)
+        #expect(items[2].title == "herdr server is not running")
+    }
+
+    @Test func offersNoUpdateWhenThereIsNone() {
+        let items = StatusMenu.items(for: .loaded([]), settings: settings, target: nil)
+        #expect(!items.contains { $0.action == #selector(StatusItemController.openUpdate(_:)) })
     }
 
     @Test func explainsWhenHerdrIsNotRunning() {

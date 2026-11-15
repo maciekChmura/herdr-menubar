@@ -21,6 +21,7 @@ Small colored dots in the menu bar: one per agent, or one per state followed by 
 - **Notifications** when an agent gets blocked or finishes. Clicking one does the same as clicking the agent in the menu. You don't get one for the agent you're already looking at.
 - **Gentle animation**: working dots breathe, a blocked dot sends out a faint ring, a dot pops when its agent finishes, and colors fade on every change. Core Animation plays it, so it costs almost no CPU. Turn it off with "Animate dots" in the menu; it's also off while macOS's Reduce motion is on.
 - **Launch at login**, from a toggle in the menu.
+- **Update check**: once a day the app asks GitHub whether a newer release is out. If one is, "Update available" at the top of the menu opens its release page. It never downloads or installs anything itself. It's the app's only connection to the internet; turn it off with "Check for updates" in the menu.
 
 It's deliberately small: it isn't a terminal, it never sends input to agents, and it has no settings window.
 
@@ -45,7 +46,7 @@ It's deliberately small: it isn't a terminal, it never sends input to agents, an
    xattr -dr com.apple.quarantine /Applications/HerdrMenubar.app
    ```
 
-To update, quit the app, download the new disk image and replace the app in Applications. macOS asks you to allow the new copy once more.
+When a newer version is out, the app's menu says so at the top. To update, quit the app, download the new disk image and replace the app in Applications. macOS asks you to allow the new copy once more.
 
 ### From source
 

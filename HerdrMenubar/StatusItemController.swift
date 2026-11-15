@@ -10,6 +10,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private let notifier = Notifier()
     private let launchAtLogin = LaunchAtLogin()
     private let animation = DotAnimationSettings()
+    private let updates = UpdateChecker()
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let dotsView = StatusDotsView()
     private let menu = NSMenu()
@@ -34,10 +35,15 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         // Clicking a notification does the same as clicking the agent's row.
         notifier.onOpen = { [weak self] paneId in self?.focus(paneId: paneId) }
         animation.onChange = { [weak self] in self?.refresh() }
+        updates.onChange = { [weak self] in
+            guard let self, self.isMenuOpen else { return }
+            self.rebuildMenu()
+        }
 
         notifier.requestAuthorization()
         refresh()
         store.start()
+        updates.start()
     }
 
     // MARK: Menu bar item
@@ -96,7 +102,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             animationTitle: animation.toggleTitle,
             animationOn: animation.userEnabled,
             launchAtLoginTitle: launchAtLogin.title,
-            launchAtLoginOn: launchAtLogin.isEnabled
+            launchAtLoginOn: launchAtLogin.isEnabled,
+            checkForUpdatesOn: updates.isEnabled,
+            update: updates.available
         )
         menu.items = StatusMenu.items(for: store.state, settings: settings, target: self)
     }
@@ -120,6 +128,16 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     @objc func toggleLaunchAtLogin(_ sender: NSMenuItem) {
         launchAtLogin.set(!launchAtLogin.isEnabled)
+    }
+
+    @objc func toggleCheckForUpdates(_ sender: NSMenuItem) {
+        updates.isEnabled.toggle()
+    }
+
+    /// Opens the release page of the update the menu offers.
+    @objc func openUpdate(_ sender: NSMenuItem) {
+        guard let url = sender.representedObject as? URL else { return }
+        NSWorkspace.shared.open(url)
     }
 
     // MARK: Actions
