@@ -4,7 +4,7 @@ Captured from herdr 0.9.5 (socket protocol 22, `schema_version` 1) on 2026-11-14
 
 ## Files
 
-- `api.schema.json`: output of `herdr api schema --output`. JSON Schemas for requests, success and error responses, events and subscription events.
+- `api.schema.json`: output of `herdr api schema --output`. JSON Schemas for requests, success and error responses, events and subscription events. It comes from [herdr](https://github.com/herdrdev/herdr), which is licensed under Apache-2.0; the rest of this repo is MIT.
 - `agent-list-example.json`: output of `herdr agent list`, anonymized.
 - `snapshot-example.json`: output of `herdr api snapshot`, anonymized.
 
