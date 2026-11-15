@@ -29,9 +29,25 @@ It's deliberately small: it isn't a terminal, it never sends input to agents, an
 - macOS 14 or later.
 - herdr running on the same Mac. Built and tested with herdr 0.9.5 (socket protocol 22).
 - Ghostty, for bringing the terminal to the front when you click an agent. herdr switches to the agent in any terminal; only bringing the window forward is Ghostty-specific.
-- To build: Xcode and [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
+- To build from source: Xcode and [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
 
 ## Install
+
+### Download
+
+1. Download `HerdrMenubar-<version>.dmg` from the [latest release](https://github.com/maciekChmura/herdr-menubar/releases/latest).
+2. Open it and drag HerdrMenubar onto Applications.
+3. Open HerdrMenubar from Applications. The app isn't notarized by Apple, so the first time, macOS refuses to open it and says it can't verify the app. Click Done, go to System Settings → Privacy & Security, scroll down to the message about HerdrMenubar and click "Open Anyway". You only do this once.
+
+   Or skip the warning: before you open the app, run this in Terminal:
+
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/HerdrMenubar.app
+   ```
+
+To update, quit the app, download the new disk image and replace the app in Applications. macOS asks you to allow the new copy once more.
+
+### From source
 
 ```bash
 git clone https://github.com/maciekChmura/herdr-menubar.git
@@ -41,14 +57,12 @@ scripts/install.sh
 
 The script builds the Release version, installs it as `/Applications/HerdrMenubar.app` and launches it. Run it again after pulling changes to update the app; "Launch at login" stays on.
 
-Then:
+Builds are ad-hoc signed by default, so you don't need an Apple developer account. To sign with your own certificate, copy `Config/Local.xcconfig.example` to `Config/Local.xcconfig` and fill in your team ID. That file is gitignored.
+
+### After installing
 
 - Allow notifications when macOS asks. If it never asks, turn them on in System Settings → Notifications → HerdrMenubar.
 - To start the app when you log in, turn on "Launch at login" in its menu.
-
-### Signing
-
-Builds are ad-hoc signed by default, so you don't need an Apple developer account. To sign with your own certificate, copy `Config/Local.xcconfig.example` to `Config/Local.xcconfig` and fill in your team ID. That file is gitignored.
 
 ## Configuration
 
@@ -72,6 +86,8 @@ xcodebuild -scheme HerdrMenubar -configuration Debug -derivedDataPath build test
 ```
 
 The tests use a fake herdr server on a temporary socket, so they never touch your real herdr session.
+
+To build the disk image for a release, set the version in `MARKETING_VERSION` in `project.yml`, then run `scripts/make-dmg.sh`. It writes `build/HerdrMenubar-<version>.dmg`. The app inside is always ad-hoc signed, even if `Config/Local.xcconfig` names your own certificate, so the image doesn't carry your name or team ID.
 
 ## License
 
