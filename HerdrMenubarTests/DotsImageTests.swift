@@ -15,6 +15,16 @@ struct DotsImageTests {
     func menuIconKeepsItsColors(status: AgentStatus) {
         let icon = DotsImage.menuIcon(for: status)
         #expect(icon.isTemplate == false, "A template image would be tinted black or white")
-        #expect(icon.size == NSSize(width: DotsImage.diameter + 2, height: DotsImage.diameter + 2))
+        #expect(icon.size == DotsImage.menuIconSize)
+    }
+
+    @Test func menuIconsWithAndWithoutTheRingAreTheSameSizeSoTitlesLineUp() {
+        let ringed = DotsImage.menuIcon(for: .done, hasBackgroundJobs: true)
+        #expect(ringed.size == DotsImage.menuIcon(for: .done).size)
+        #expect(ringed.size.width >= DotsImage.diameter + 2 * DotsImage.jobRingExtent, "Room for the whole ring")
+    }
+
+    @Test func theRingIsGreenLikeWorking() {
+        #expect(DotsImage.jobRingColor == DotsImage.style(for: .working).color)
     }
 }

@@ -66,10 +66,13 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             button.setAccessibilityLabel(name == MenuBarLabel.unreachableSymbol ? "herdr is not running" : "No agents")
         case .dots(let panes):
             show(.dots(panes), in: button, height: height)
-            button.setAccessibilityLabel(MenuBarLabel.spokenSummary(of: MenuBarLabel.statusCounts(of: panes.map(\.status))))
-        case .counts(let counts):
-            show(.counts(counts), in: button, height: height)
-            button.setAccessibilityLabel(MenuBarLabel.spokenSummary(of: counts))
+            button.setAccessibilityLabel(MenuBarLabel.spokenSummary(
+                of: MenuBarLabel.statusCounts(of: panes.map(\.status)),
+                inBackground: panes.count(where: \.hasBackgroundJobs)
+            ))
+        case .counts(let counts, let inBackground):
+            show(.counts(counts, inBackground: inBackground), in: button, height: height)
+            button.setAccessibilityLabel(MenuBarLabel.spokenSummary(of: counts, inBackground: inBackground))
         }
     }
 

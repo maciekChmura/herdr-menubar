@@ -8,6 +8,7 @@ A native macOS menu bar app that shows the live state of the AI coding agents ru
 - Update the moment an agent changes state, using herdr's event subscription instead of a polling loop.
 - Focus any agent in the open herdr TUI with one click.
 - Get a macOS notification when an agent gets blocked or finishes.
+- See when an agent has finished its turn but left a command running in the background, such as a long test run, and will start working again when it ends.
 
 ## Non-goals (v1)
 
@@ -59,12 +60,14 @@ Every state is shown as a small dot, 10 points across, drawn by the app in the s
 
 This order (blocked, working, done, idle, unknown) is used for the counts in the menu bar and for sorting the dropdown.
 
+A green ring around a dot isn't a state: it marks an agent with background jobs. See "Background jobs".
+
 ## Menu bar label
 
 The user picks one of two styles under "Menu bar shows" in the menu. The choice is remembered across launches.
 
-- **Counts per state** (the default): a dot and its count for each state, in the order above, with zero counts left out, such as "● 1  ● 3  ● 2". The numbers use the system text color, resolved when the menu bar draws them, so they match the menu bar even when the menu bar is light and the menu is dark.
-- **One dot per agent**: one dot per agent, in the order herdr lists the agents. Each agent keeps its place, and only its color changes when its state changes.
+- **Counts per state** (the default): a dot and its count for each state, in the order above, with zero counts left out, such as "● 1  ● 3  ● 2". The numbers use the system text color, resolved when the menu bar draws them, so they match the menu bar even when the menu bar is light and the menu is dark. After the working count comes a green ring with the number of agents that have background jobs (added in M10), left out when it's zero. Those agents are still counted in their own state too.
+- **One dot per agent**: one dot per agent, in the order herdr lists the agents. Each agent keeps its place, and only its color changes when its state changes. An agent with background jobs gets a green ring around its dot (added in M10).
 
 In both styles:
 
@@ -80,6 +83,7 @@ The menu bar dots move gently, so it's easy to see at a glance that agents are b
 - **done**: one small pop when the agent finishes. The dot grows by 30% and settles back, in 0.35 s.
 - **any state change**: the color fades from the old state to the new one over 0.3 s.
 - **idle and unknown**: still.
+- **background jobs** (added in M10): the green ring breathes like a working dot, in step with them.
 
 The first time the dots are shown, after launch, a reconnect or switching the menu bar style, nothing fades or pops: only real changes do. In counts mode, the done dot pops when its count goes up.
 
@@ -94,9 +98,10 @@ An AppKit `NSMenu`, rebuilt each time it opens, and updated while it's open when
 1. **Update** (added in M9): only when a newer release is out, "Update available: 0.2.0…" followed by a separator. See "Update check".
 2. **Header**: a disabled item with the agent count, such as "4 agents".
 3. **Agent rows**: one item per agent, in the same order as the menu bar. In dots mode that's herdr's order, so the 2nd dot is the 2nd row. In counts mode the rows are sorted by state in the order above, like the counts, then by folder name. Each row shows:
-   - the state dot, as the item's icon;
+   - the state dot, as the item's icon, with the green ring when the agent has background jobs;
    - the title: `terminal_title_stripped`, or `agent` when the title is empty;
-   - the folder: the last path component of `foreground_cwd`, falling back to `cwd`.
+   - the folder: the last path component of `foreground_cwd`, falling back to `cwd`;
+   - the background jobs, if any (added in M10), as a second line such as "In background: npm test (12m)". The second line is the item's `subtitle`, which needs macOS 14.4; on older versions the text is the item's tooltip.
 
    Mark the agent whose `focused` is `true`, for example with a checkmark.
 4. **Footer**: the "Menu bar shows" choice (added in M7), an "Animate dots" toggle (added in M8), a "Launch at login" toggle (added in M6), a "Check for updates" toggle (added in M9) and "Quit".
@@ -120,6 +125,19 @@ Focusing an agent marks it as seen, so a `done` agent turns `idle`. This is expe
 - Skip the notification when that agent is `focused` and Ghostty is the frontmost app. The user is already looking at it.
 - Ask for notification permission on first launch.
 - herdr's TUI may show its own notifications too. Duplicates are acceptable in v1.
+
+## Background jobs
+
+An agent can start a long command in the background, such as a test run or a data export, end its turn and wait for it. herdr then reports the agent as `done` or `idle`, although the agent starts working again by itself when the command finishes. herdr can't see these commands: it reads the screen, and Claude Code only shows them as "· 2 shells" below its prompt. The app finds them in the process tree instead and marks the agent with a green ring. The agent's state stays as herdr reports it, so a `done` agent still notifies.
+
+- **Which agents**: only `done` and `idle` ones. A working agent's commands are part of its work, and a blocked agent is waiting for the user.
+- **Finding the jobs**: `pane.process_info` returns the pane's foreground process group. While the agent waits for input, that's the agent's own group. A background job is a process whose parent is in that group but which runs in a process group of its own. Claude Code starts every Bash command that way, while its MCP servers stay in its group. See `docs/herdr/README.md`.
+- **At least 5 seconds old**: Claude Code's status line and hooks also run in process groups of their own, but for well under a second, so younger processes don't count. When one is skipped, check again once it would be 5 seconds old.
+- **The command shown**: the first process under the job's shell that isn't a shell itself, such as `sleep 240`, or `npm test` in `( time npm test )`, which runs in a subshell. Paths are shortened to their last component, and an interpreter that runs a script by its path is left out, so `node /opt/homebrew/bin/npm test` shows as `npm test`. When the shell hasn't started anything, its own name.
+- **When to check**: on every `agent.list` fetch. When a job ends, the agent wakes up and herdr's status event removes the ring. The 30-second safety fetch removes it if a job was stopped without waking the agent.
+- When `pane.process_info` fails, that agent has no background jobs. The failure is logged and doesn't stop the rest of the fetch.
+
+A background job isn't always something the agent waits for: a dev server left running also counts. The ring says that something the agent started is still running.
 
 ## Update check
 
@@ -248,3 +266,14 @@ Done when:
 - Comparing versions and reading GitHub's reply are unit-tested, including tags that aren't plain numbers, a repo with no releases, and a failed check.
 - Pointed at a repo whose latest release is newer, the menu offers it, and clicking it opens the release page.
 - With "Check for updates" off, the app sends no request to GitHub.
+
+### M10: Background jobs
+
+- [x] Finding the background jobs of `done` and `idle` agents through `pane.process_info` and the process tree, as described in "Background jobs".
+- [x] A green ring around the agent's dot in the menu bar and in its menu row, a ring with a count in counts mode, and the jobs on a second line under the agent's row.
+
+Done when:
+- Finding jobs is unit-tested: jobs in a group of their own, MCP servers in the agent's group left out, jobs younger than 5 seconds left out and checked again, the command shown, and no `pane.process_info` call for working agents.
+- The ring, the count and the row's second line are unit-tested.
+- A real agent that starts a command in the background and ends its turn gets the ring within a few seconds, and loses it when the command finishes.
+- `docs/herdr/README.md` records `pane.process_info` and what herdr reports while a background command runs.

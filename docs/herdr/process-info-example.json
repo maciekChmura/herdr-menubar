@@ -1,0 +1,37 @@
+{
+  "id": "1",
+  "result": {
+    "type": "pane_process_info",
+    "process_info": {
+      "pane_id": "w1:pA",
+      "shell_pid": 41001,
+      "foreground_process_group_id": 41020,
+      "foreground_processes": [
+        {
+          "pid": 41090,
+          "name": "caffeinate",
+          "argv0": "caffeinate",
+          "argv": ["caffeinate", "-i", "-t", "300"],
+          "cmdline": "caffeinate -i -t 300",
+          "cwd": "/Users/me/dev/project-c"
+        },
+        {
+          "pid": 41031,
+          "name": "example-mcp",
+          "argv0": "example-mcp",
+          "argv": ["/usr/local/bin/example-mcp", "mcp"],
+          "cmdline": "/usr/local/bin/example-mcp mcp",
+          "cwd": "/Users/me/dev/project-c"
+        },
+        {
+          "pid": 41020,
+          "name": "2.1.326",
+          "argv0": "claude",
+          "argv": ["claude"],
+          "cmdline": "claude",
+          "cwd": "/Users/me/dev/project-c"
+        }
+      ]
+    }
+  }
+}

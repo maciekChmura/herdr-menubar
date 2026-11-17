@@ -145,6 +145,10 @@ enum FakeHerdr {
         return #"{"id":"\#(id)","result":{"type":"agent_list","agents":[\#(items.joined(separator: ","))]}}"#
     }
 
+    static func processInfo(id: String, pane: String, group: Int32) -> String {
+        #"{"id":"\#(id)","result":{"type":"pane_process_info","process_info":{"pane_id":"\#(pane)","shell_pid":1,"foreground_process_group_id":\#(group),"foreground_processes":[]}}}"#
+    }
+
     static func subscriptionStarted(id: String) -> String {
         #"{"id":"\#(id)","result":{"type":"subscription_started"}}"#
     }

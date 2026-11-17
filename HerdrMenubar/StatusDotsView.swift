@@ -9,26 +9,42 @@ import QuartzCore
 final class StatusDotsView: NSView {
     enum Content: Equatable {
         case dots([PaneStatus])
-        case counts([StatusCount])
+        /// The counts per state, and how many agents have background jobs.
+        case counts([StatusCount], inBackground: Int)
+    }
+
+    /// The key of the count of agents with background jobs, in counts mode.
+    static let backgroundKey = "background"
+
+    private struct Entry {
+        let key: String
+        /// Nil for the count of agents with background jobs, which shows only the ring.
+        let status: AgentStatus?
+        let hasJobs: Bool
+        let count: Int?
     }
 
     @MainActor
     private final class Item {
         let key: String
-        var status: AgentStatus
+        var status: AgentStatus?
+        var hasJobs: Bool
         var count: Int?
-        /// Positions the dot; `dot` and `ring` fill it.
+        /// Positions the dot; `dot`, `ring` and `jobRing` fill it.
         let holder = CALayer()
         let dot = CAShapeLayer()
         /// Only visible while a blocked dot's ring animation is playing.
         let ring = CAShapeLayer()
+        /// The green ring around an agent with background jobs.
+        let jobRing = CAShapeLayer()
         let label: NSTextField?
 
-        init(key: String, status: AgentStatus, count: Int?) {
-            self.key = key
-            self.status = status
-            self.count = count
-            if count != nil {
+        init(entry: Entry) {
+            key = entry.key
+            status = entry.status
+            hasJobs = entry.hasJobs
+            count = entry.count
+            if entry.count != nil {
                 let field = NSTextField(labelWithString: "")
                 field.font = DotsImage.countFont
                 field.textColor = .labelColor
@@ -39,7 +55,10 @@ final class StatusDotsView: NSView {
             ring.fillColor = nil
             ring.lineWidth = 1
             ring.opacity = 0
+            jobRing.fillColor = nil
+            jobRing.lineWidth = DotsImage.jobRingLineWidth
             holder.addSublayer(ring)
+            holder.addSublayer(jobRing)
             holder.addSublayer(dot)
         }
     }
@@ -94,31 +113,28 @@ final class StatusDotsView: NSView {
     @discardableResult
     func show(_ content: Content, animationsEnabled: Bool, height: CGFloat) -> CGFloat {
         self.animationsEnabled = animationsEnabled
-        let entries: [(key: String, status: AgentStatus, count: Int?)] = switch content {
-        case .dots(let panes): panes.map { (key: $0.paneId, status: $0.status, count: nil) }
-        case .counts(let counts): counts.map { (key: "state:\($0.status.rawValue)", status: $0.status, count: $0.count) }
-        }
         let animateChanges = hasShownContent && animationsEnabled
         var existing = Dictionary(items.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
         var next: [Item] = []
 
         let width = withoutImplicitAnimations {
-            for entry in entries {
+            for entry in Self.entries(for: content) {
                 let item: Item
                 if let reused = existing.removeValue(forKey: entry.key) {
                     item = reused
                     let before = (status: item.status, count: item.count)
                     item.status = entry.status
+                    item.hasJobs = entry.hasJobs
                     item.count = entry.count
-                    if animateChanges, before.status != entry.status {
-                        fade(item, from: before.status)
+                    if animateChanges, let old = before.status, let new = entry.status, old != new {
+                        fade(item, from: old, to: new)
                     }
                     let finished = before.status != .done || (entry.count ?? 0) > (before.count ?? 0)
                     if animateChanges, entry.status == .done, finished {
                         item.dot.add(DotAnimation.pop(), forKey: "pop")
                     }
                 } else {
-                    item = Item(key: entry.key, status: entry.status, count: entry.count)
+                    item = Item(entry: entry)
                     dotsLayer.addSublayer(item.holder)
                     if let label = item.label { addSubview(label) }
                     applyScale(item)
@@ -141,6 +157,20 @@ final class StatusDotsView: NSView {
         }
         hasShownContent = true
         return width
+    }
+
+    private static func entries(for content: Content) -> [Entry] {
+        switch content {
+        case .dots(let panes):
+            return panes.map { Entry(key: $0.paneId, status: $0.status, hasJobs: $0.hasBackgroundJobs, count: nil) }
+        case .counts(let counts, let inBackground):
+            var entries = counts.map { Entry(key: "state:\($0.status.rawValue)", status: $0.status, hasJobs: false, count: $0.count) }
+            if inBackground > 0 {
+                let background = Entry(key: backgroundKey, status: nil, hasJobs: true, count: inBackground)
+                entries.insert(background, at: MenuBarLabel.backgroundIndex(in: counts))
+            }
+            return entries
+        }
     }
 
     // MARK: Drawing
@@ -172,18 +202,25 @@ final class StatusDotsView: NSView {
     }
 
     private func applyStyle(_ item: Item) {
-        let values = shapeValues(for: item.status)
-        item.dot.fillColor = values.fill
-        item.dot.strokeColor = values.stroke
-        item.dot.lineWidth = values.lineWidth
-        item.dot.path = values.path
-        item.ring.strokeColor = resolved(DotsImage.style(for: item.status).color)
+        if let status = item.status {
+            let values = shapeValues(for: status)
+            item.dot.fillColor = values.fill
+            item.dot.strokeColor = values.stroke
+            item.dot.lineWidth = values.lineWidth
+            item.dot.path = values.path
+            item.ring.strokeColor = resolved(DotsImage.style(for: status).color)
+        } else {
+            item.dot.path = nil
+        }
         item.ring.path = DotAnimation.circle(diameter: DotsImage.diameter, centeredIn: DotsImage.diameter)
+        item.jobRing.strokeColor = resolved(DotsImage.jobRingColor)
+        item.jobRing.path = DotsImage.jobRingPath
+        item.jobRing.isHidden = !item.hasJobs
     }
 
-    private func fade(_ item: Item, from previous: AgentStatus) {
+    private func fade(_ item: Item, from previous: AgentStatus, to status: AgentStatus) {
         let old = shapeValues(for: previous)
-        let new = shapeValues(for: item.status)
+        let new = shapeValues(for: status)
         item.dot.add(DotAnimation.fade(keyPath: "fillColor", from: old.fill, to: new.fill), forKey: "fadeFill")
         item.dot.add(DotAnimation.fade(keyPath: "strokeColor", from: old.stroke, to: new.stroke), forKey: "fadeStroke")
         item.dot.add(DotAnimation.fade(keyPath: "lineWidth", from: old.lineWidth, to: new.lineWidth), forKey: "fadeLineWidth")
@@ -193,13 +230,17 @@ final class StatusDotsView: NSView {
     private func applyContinuousAnimation(_ item: Item) {
         item.dot.removeAnimation(forKey: "breathing")
         item.ring.removeAnimation(forKey: "ping")
+        item.jobRing.removeAnimation(forKey: "breathing")
         guard animationsEnabled else { return }
+        if item.hasJobs {
+            item.jobRing.add(DotAnimation.breathing(beginTime: Self.epoch), forKey: "breathing")
+        }
         switch item.status {
         case .working:
             item.dot.add(DotAnimation.breathing(beginTime: Self.epoch), forKey: "breathing")
         case .blocked:
             item.ring.add(DotAnimation.ping(beginTime: Self.epoch, diameter: DotsImage.diameter), forKey: "ping")
-        case .done, .idle, .unknown:
+        case .done, .idle, .unknown, nil:
             break
         }
     }
@@ -207,7 +248,7 @@ final class StatusDotsView: NSView {
     private func applyScale(_ item: Item) {
         // Shape layers are drawn at this scale; without it they'd be blurry on a Retina display.
         let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
-        for layer in [item.holder, item.dot, item.ring] {
+        for layer in [item.holder, item.dot, item.ring, item.jobRing] {
             layer.contentsScale = scale
         }
     }
@@ -223,11 +264,15 @@ final class StatusDotsView: NSView {
         let diameter = DotsImage.diameter
         var x = DotsImage.padding
         for (index, item) in items.enumerated() {
+            // A dot with a ring takes the ring's room on both sides, so rings never touch their neighbors.
+            let ringRoom = item.hasJobs ? DotsImage.jobRingExtent : 0
+            x += ringRoom
             item.holder.bounds = CGRect(x: 0, y: 0, width: diameter, height: diameter)
             item.holder.position = CGPoint(x: x + diameter / 2, y: height / 2)
             item.dot.frame = item.holder.bounds
             item.ring.frame = item.holder.bounds
-            x += diameter
+            item.jobRing.frame = item.holder.bounds
+            x += diameter + ringRoom
             let isLast = index == items.count - 1
             if let label = item.label {
                 label.sizeToFit()
@@ -263,5 +308,17 @@ final class StatusDotsView: NSView {
 
     func ringAnimationKeys(for key: String) -> Set<String> {
         Set(items.first { $0.key == key }?.ring.animationKeys() ?? [])
+    }
+
+    func showsJobRing(for key: String) -> Bool {
+        items.first { $0.key == key }.map { !$0.jobRing.isHidden && $0.jobRing.path != nil } ?? false
+    }
+
+    func showsDot(for key: String) -> Bool {
+        items.first { $0.key == key }?.dot.path != nil
+    }
+
+    func jobRingAnimationKeys(for key: String) -> Set<String> {
+        Set(items.first { $0.key == key }?.jobRing.animationKeys() ?? [])
     }
 }

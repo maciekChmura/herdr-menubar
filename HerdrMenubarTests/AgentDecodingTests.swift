@@ -24,6 +24,25 @@ struct AgentDecodingTests {
         #expect(first.displayTitle == "Example task 1")
     }
 
+    @Test func decodesTheCapturedProcessInfo() throws {
+        let data = try Data(contentsOf: Self.repoRoot.appending(path: "docs/herdr/process-info-example.json"))
+        let info = try HerdrClient.decodeResponse(PaneProcessInfoResult.self, from: data, requestID: nil).processInfo
+
+        #expect(info.paneId == "w1:pA")
+        #expect(info.shellPid == 41001)
+        #expect(info.foregroundProcessGroupId == 41020)
+    }
+
+    @Test func decodesProcessInfoForAPaneWithoutAForegroundGroup() throws {
+        let line = Data(#"{"id":"1","result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p1","foreground_processes":[]}}}"#.utf8)
+        let info = try HerdrClient.decodeResponse(PaneProcessInfoResult.self, from: line, requestID: "1").processInfo
+        #expect(info.foregroundProcessGroupId == nil)
+    }
+
+    @Test func agentsFromHerdrHaveNoBackgroundJobs() throws {
+        #expect(try decodeAgent().backgroundJobs.isEmpty, "The app finds them; herdr doesn't report them")
+    }
+
     @Test(arguments: ["blocked", "working", "done", "idle", "unknown"])
     func decodesEveryKnownStatus(raw: String) throws {
         let agent = try decodeAgent(status: raw)

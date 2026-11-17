@@ -34,9 +34,17 @@ final class AgentStore {
             + panes.sorted().map { Subscription(type: "pane.agent_status_changed", paneId: $0) }
     }
 
+    /// One fetch's result: the agents, with the background jobs of those waiting for input.
+    struct Fetch: Sendable {
+        var agents: [Agent]
+        /// When a process too young to count as a background job becomes old enough. See `BackgroundJobs`.
+        var recheckDate: Date?
+    }
+
     private(set) var state: State = .loading
     private let client: HerdrClient
     private let timing: Timing
+    private let processes: ProcessSource
     @ObservationIgnored private var syncTask: Task<Void, Never>?
     @ObservationIgnored private var sessionSubscribed = false
     /// True until the first fetch after launch or after a lost connection: that fetch only sets the baseline
@@ -48,9 +56,10 @@ final class AgentStore {
     @ObservationIgnored var onAgentsChanged: (([Agent]) -> Void)?
     private let log = Logger(subsystem: "io.github.maciekchmura.HerdrMenubar", category: "herdr")
 
-    init(client: HerdrClient, timing: Timing = Timing()) {
+    init(client: HerdrClient, timing: Timing = Timing(), processes: ProcessSource = .system) {
         self.client = client
         self.timing = timing
+        self.processes = processes
     }
 
     /// Starts keeping `state` in sync. Calling it again while running does nothing.
@@ -110,7 +119,7 @@ final class AgentStore {
     /// Lists the agents, subscribes to their events, and refetches on every event until the
     /// subscription drops (throws) or the set of agent panes changes (returns).
     private func runSession() async throws {
-        apply(try await client.listAgents(), isBaseline: needsBaseline)
+        apply(try await Self.fetch(client: client, processes: processes).agents, isBaseline: needsBaseline)
         needsBaseline = false
         guard case .loaded(let agents) = state else { return }
         let panes = Set(agents.map(\.paneId))
@@ -122,9 +131,11 @@ final class AgentStore {
         let (triggers, trigger) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
         // Fetch once more now: a change between the first fetch and the subscription would otherwise be missed.
         trigger.yield()
+        let (rechecks, recheck) = AsyncStream<Date>.makeStream(bufferingPolicy: .bufferingNewest(1))
 
         let client = client
         let timing = timing
+        let processes = processes
         let log = log
         try await withThrowingTaskGroup(of: Void.self) { group in
             group.addTask {
@@ -140,20 +151,68 @@ final class AgentStore {
                     trigger.yield()
                 }
             }
+            group.addTask {
+                // A process was too young to count as a background job: look again once it's old enough.
+                for await date in rechecks {
+                    try await Task.sleep(for: .seconds(max(date.timeIntervalSinceNow, 0) + 0.1))
+                    trigger.yield()
+                }
+            }
             group.addTask { [weak self] in
                 // Triggers that arrive while waiting or fetching collapse into one buffered trigger.
                 for await _ in triggers {
                     try await Task.sleep(for: timing.refreshDebounce)
-                    let agents = try await client.listAgents()
+                    let fetch = try await Self.fetch(client: client, processes: processes)
                     guard let self else { return }
-                    await self.apply(agents)
-                    if Set(agents.map(\.paneId)) != panes { return }
+                    await self.apply(fetch.agents)
+                    if let date = fetch.recheckDate { recheck.yield(date) }
+                    if Set(fetch.agents.map(\.paneId)) != panes { return }
                 }
             }
             try await group.next()
             group.cancelAll()
         }
     }
+
+    /// Lists the agents and finds the background jobs of the `done` and `idle` ones.
+    /// See "Background jobs" in `docs/PRD.md`.
+    nonisolated static func fetch(client: HerdrClient, processes: ProcessSource) async throws -> Fetch {
+        var agents = try await client.listAgents()
+        let waiting = agents.indices.filter { [.done, .idle].contains(agents[$0].agentStatus) }
+        guard !waiting.isEmpty else { return Fetch(agents: agents) }
+
+        let groups = await withTaskGroup(of: (index: Int, group: Int32?).self) { tasks in
+            for index in waiting {
+                let paneId = agents[index].paneId
+                tasks.addTask {
+                    do {
+                        return (index, try await client.foregroundProcessGroup(ofPane: paneId))
+                    } catch {
+                        jobsLog.debug("No process info for pane \(paneId, privacy: .public): \(String(describing: error), privacy: .public)")
+                        return (index, nil)
+                    }
+                }
+            }
+            var groups: [Int: Int32] = [:]
+            for await result in tasks {
+                if let group = result.group { groups[result.index] = group }
+            }
+            return groups
+        }
+        guard !groups.isEmpty else { return Fetch(agents: agents) }
+
+        let table = processes.list()
+        let now = Date()
+        var recheckDate: Date?
+        for (index, group) in groups {
+            let scan = BackgroundJobs.scan(agentGroup: group, in: table, now: now, arguments: processes.arguments)
+            agents[index].backgroundJobs = scan.jobs
+            if let date = scan.recheckDate { recheckDate = min(recheckDate ?? date, date) }
+        }
+        return Fetch(agents: agents, recheckDate: recheckDate)
+    }
+
+    private nonisolated static let jobsLog = Logger(subsystem: "io.github.maciekchmura.HerdrMenubar", category: "herdr")
 
     private func setState(_ newState: State) {
         state = newState

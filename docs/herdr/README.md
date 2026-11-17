@@ -7,6 +7,7 @@ Captured from herdr 0.9.5 (socket protocol 22, `schema_version` 1) on 2026-11-14
 - `api.schema.json`: output of `herdr api schema --output`. JSON Schemas for requests, success and error responses, events and subscription events. It comes from [herdr](https://github.com/herdrdev/herdr), which is licensed under Apache-2.0; the rest of this repo is MIT.
 - `agent-list-example.json`: output of `herdr agent list`, anonymized.
 - `snapshot-example.json`: output of `herdr api snapshot`, anonymized.
+- `process-info-example.json`: a `pane.process_info` reply for a Claude Code agent waiting for input, anonymized.
 
 The examples contain agents in the `idle`, `working` and `unknown` states. No agent was `blocked` or `done` when they were captured. Agents in those states use the same `AgentInfo` object; only `agent_status` differs. Some fields are optional: `completion_seq`, for example, is present only on agents that have completed at least once.
 
@@ -33,6 +34,15 @@ The repo is public, so the examples were anonymized: paths, terminal titles, tab
 - **Event names don't always match subscription types**: subscribing to `pane.focused`, `tab.focused` or `workspace.focused` delivers events named `pane_focused`, `tab_focused` and `workspace_focused`, with an extra `type` field in `data`. Status events keep the dotted name `pane.agent_status_changed`.
 - **`done` can turn `idle` without any focus event**: the two agents that went `done` to `idle` together did so with no `*_focused` event before them. Switching to a `done` agent in the herdr TUI turns it `idle`, with `pane_focused` and `pane.agent_status_changed` arriving together.
 - **`agent.focus` and `agent.get` accept a pane ID as `target`**, for example `{"target": "w1:p6"}`. herdr switches the TUI to that pane and sends `pane_focused` about 10 ms later. Focusing the pane that's already focused succeeds and sends no event. An unknown target returns the error `agent_not_found`.
+- **`pane.process_info` takes `{"pane_id": "w1:p1"}`** and returns `{"type": "pane_process_info", "process_info": {...}}` with `shell_pid`, `foreground_process_group_id` and `foreground_processes`. While a Claude Code agent waits for input, the foreground group is the `claude` process's own: `claude` leads it, and its MCP servers (and `caffeinate`, while it's working) are in it. `tty` is in the schema but wasn't in the replies.
+- **`agent.explain` takes `{"target": "w1:p1"}`** and lists every detection rule for the agent, whether it matched, and the screen text it looked at. It's read-only and the quickest way to see why herdr reports a state.
+
+## Background commands: verified with Claude Code 2.1.326
+
+- **herdr doesn't see them.** An agent that started `sleep 240` with the Bash tool's `run_in_background` and ended its turn stayed `done` the whole time; `agent.explain` matched only `live_prompt_box` and `osc_title_idle`. herdr's Claude manifest (2026.10.11.1) only treats "Waiting for N background agents to finish" and "N MCP tasks still running" as working. Claude Code shows background commands only as "· 2 shells" in the footer below its prompt.
+- **They're in the process tree.** Claude Code runs every Bash command, in the foreground or the background, as `zsh -c …`: a child of the `claude` process that leads a session and process group of its own. Under it is the command itself, sometimes behind a subshell, as in `( time npm test )`. MCP servers stay in `claude`'s group. This app finds background commands this way; see "Background jobs" in `docs/PRD.md`.
+- **The status line also runs in a group of its own.** Sampling every 20 ms found the status line command as a child of `claude` in its own group and session, each time alive for well under a second. Hence the app's 5-second minimum age.
+- When the background command ends, Claude Code wakes the agent up, and herdr reports `working` again.
 
 ## Not yet verified
 

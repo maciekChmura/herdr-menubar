@@ -16,10 +16,11 @@ Small colored dots in the menu bar: one per agent, or one per state followed by 
   | Gray | idle | Ready for input, already seen |
   | Gray ring | unknown | herdr can't tell |
 
-- **One row per agent** in the menu, with its state dot, title and folder. A checkmark marks the agent that's focused in herdr.
+- **Background jobs**: when an agent ends its turn but leaves a command running in the background, such as a long test run, its dot gets a green ring until the command ends. herdr can't see the command and reports the agent as done or idle, so the app finds it in the process tree. In counts mode, a green ring with a number shows how many agents have one.
+- **One row per agent** in the menu, with its state dot, title and folder. A checkmark marks the agent that's focused in herdr. An agent's background jobs are listed under it, such as "In background: npm test (12m)".
 - **Click to focus**: clicking an agent switches herdr to it and brings Ghostty to the front.
 - **Notifications** when an agent gets blocked or finishes. Clicking one does the same as clicking the agent in the menu. You don't get one for the agent you're already looking at.
-- **Gentle animation**: working dots breathe, a blocked dot sends out a faint ring, a dot pops when its agent finishes, and colors fade on every change. Core Animation plays it, so it costs almost no CPU. Turn it off with "Animate dots" in the menu; it's also off while macOS's Reduce motion is on.
+- **Gentle animation**: working dots and the rings of background jobs breathe, a blocked dot sends out a faint ring, a dot pops when its agent finishes, and colors fade on every change. Core Animation plays it, so it costs almost no CPU. Turn it off with "Animate dots" in the menu; it's also off while macOS's Reduce motion is on.
 - **Launch at login**, from a toggle in the menu.
 - **Update check**: once a day the app asks GitHub whether a newer release is out. If one is, "Update available" at the top of the menu opens its release page. It never downloads or installs anything itself. It's the app's only connection to the internet; turn it off with "Check for updates" in the menu.
 

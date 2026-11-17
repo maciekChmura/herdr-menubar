@@ -34,6 +34,13 @@ struct Agent: Decodable, Identifiable, Equatable, Sendable {
     let cwd: String?
     let foregroundCwd: String?
     let terminalTitleStripped: String?
+    /// Commands the agent left running in the background. Not from herdr: `AgentStore` finds them in the
+    /// process tree, and only for `done` and `idle` agents. See "Background jobs" in `docs/PRD.md`.
+    var backgroundJobs: [BackgroundJob] = []
+
+    private enum CodingKeys: String, CodingKey {
+        case paneId, workspaceId, tabId, agent, name, agentStatus, focused, cwd, foregroundCwd, terminalTitleStripped
+    }
 
     var id: String { paneId }
 

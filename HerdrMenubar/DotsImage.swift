@@ -40,11 +40,32 @@ enum DotsImage {
     /// Width of a ring-style dot's outline.
     static let ringLineWidth: CGFloat = 1.5
 
-    /// The still dot shown before an agent's title in the menu. A non-template image, so it keeps its color.
-    static func menuIcon(for status: AgentStatus) -> NSImage {
-        let size = NSSize(width: diameter + 2, height: diameter + 2)
-        let image = NSImage(size: size, flipped: false) { _ in
-            let rect = NSRect(x: 1, y: 1, width: diameter, height: diameter)
+    /// The ring around the dot of an agent with background jobs, and the symbol for their count in counts mode.
+    /// Green, like working, because something the agent started is still running. See "Background jobs" in
+    /// `docs/PRD.md`.
+    static let jobRingColor: NSColor = .systemGreen
+    /// Space between the dot's edge and the ring.
+    static let jobRingGap: CGFloat = 1.5
+    static let jobRingLineWidth: CGFloat = 1.5
+    /// How far the ring reaches beyond the dot's edge.
+    static var jobRingExtent: CGFloat { jobRingGap + jobRingLineWidth }
+
+    /// The ring's path in a dot-sized square: centered on the dot, through the middle of the ring's line.
+    static var jobRingPath: CGPath {
+        DotAnimation.circle(diameter: diameter + 2 * jobRingGap + jobRingLineWidth, centeredIn: diameter)
+    }
+
+    /// The menu icons' size: room for a dot and its ring, so every row's title starts in the same place.
+    static var menuIconSize: NSSize {
+        let side = diameter + 2 * jobRingExtent
+        return NSSize(width: side, height: side)
+    }
+
+    /// The still dot shown before an agent's title in the menu, with the green ring when the agent has background
+    /// jobs. A non-template image, so it keeps its colors.
+    static func menuIcon(for status: AgentStatus, hasBackgroundJobs: Bool = false) -> NSImage {
+        let image = NSImage(size: menuIconSize, flipped: false) { _ in
+            let rect = NSRect(x: jobRingExtent, y: jobRingExtent, width: diameter, height: diameter)
             let style = style(for: status)
             switch style.fill {
             case .solid:
@@ -54,6 +75,13 @@ enum DotsImage {
                 let path = NSBezierPath(ovalIn: rect.insetBy(dx: ringLineWidth / 2, dy: ringLineWidth / 2))
                 path.lineWidth = ringLineWidth
                 style.color.setStroke()
+                path.stroke()
+            }
+            if hasBackgroundJobs {
+                let inset = -(jobRingGap + jobRingLineWidth / 2)
+                let path = NSBezierPath(ovalIn: rect.insetBy(dx: inset, dy: inset))
+                path.lineWidth = jobRingLineWidth
+                jobRingColor.setStroke()
                 path.stroke()
             }
             return true

@@ -68,6 +68,17 @@ struct AgentRowTests {
         #expect(row.title == "Task")
     }
 
+    @Test func summarizesTheBackgroundJobs() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        var withJobs = agent("p1", .done, folder: "project-a")
+        withJobs.backgroundJobs = [
+            BackgroundJob(pid: 10, command: "npm test", startDate: now - 12 * 60),
+            BackgroundJob(pid: 11, command: "sleep 240", startDate: now - 45),
+        ]
+        #expect(AgentRow(agent: withJobs).backgroundSummary(now: now) == "In background: npm test (12m), sleep 240 (45s)")
+        #expect(AgentRow(agent: agent("p2", .done, folder: "project-a")).backgroundSummary(now: now) == nil)
+    }
+
     @Test(arguments: [(0, "No agents"), (1, "1 agent"), (4, "4 agents")])
     func header(count: Int, expected: String) {
         #expect(AgentRow.header(agentCount: count) == expected)

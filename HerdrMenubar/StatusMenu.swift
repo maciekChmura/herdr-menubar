@@ -16,7 +16,8 @@ enum StatusMenu {
 
     /// The menu's items. Agent rows carry their pane ID as `representedObject`, the "Menu bar shows"
     /// choices the style's raw value, and the update item the release page's URL. Actions go to `target`.
-    static func items(for state: AgentStore.State, settings: Settings, target: AnyObject?) -> [NSMenuItem] {
+    /// `now` is when the background jobs' running times are measured to.
+    static func items(for state: AgentStore.State, settings: Settings, target: AnyObject?, now: Date = Date()) -> [NSMenuItem] {
         var items: [NSMenuItem] = []
 
         if let update = settings.update {
@@ -44,12 +45,19 @@ enum StatusMenu {
                     let item = NSMenuItem(title: row.title, action: #selector(StatusItemController.selectAgent(_:)), keyEquivalent: "")
                     item.target = target
                     item.representedObject = row.agent.paneId
-                    item.image = DotsImage.menuIcon(for: row.agent.agentStatus)
+                    item.image = DotsImage.menuIcon(for: row.agent.agentStatus, hasBackgroundJobs: !row.agent.backgroundJobs.isEmpty)
                     if #available(macOS 27, *) {
                         // From macOS 27, AppKit hides menu item images unless the item asks for them.
                         item.preferredImageVisibility = .visible
                     }
                     item.state = row.agent.focused ? .on : .off
+                    if let summary = row.backgroundSummary(now: now) {
+                        if #available(macOS 14.4, *) {
+                            item.subtitle = summary
+                        } else {
+                            item.toolTip = summary
+                        }
+                    }
                     items.append(item)
                 }
             }

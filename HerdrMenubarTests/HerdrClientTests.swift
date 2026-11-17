@@ -125,6 +125,19 @@ struct HerdrClientTests {
         }
     }
 
+    @Test func asksForAPanesForegroundProcessGroup() async throws {
+        let server = try FakeHerdrServer { request in
+            .reply(FakeHerdr.processInfo(id: request["id"] as? String ?? "", pane: "w1:p1", group: 4242))
+        }
+        defer { server.stop() }
+
+        let group = try await HerdrClient(socketPath: server.path).foregroundProcessGroup(ofPane: "w1:p1")
+
+        #expect(group == 4242)
+        let request = try #require(server.requests(method: "pane.process_info").first)
+        #expect((request["params"] as? [String: String]) == ["pane_id": "w1:p1"])
+    }
+
     @Test func resolvesTheSocketPathInOrderOfPrecedence() throws {
         let defaults = try #require(UserDefaults(suiteName: "HerdrClientTests-\(UUID().uuidString)"))
         let home = URL(fileURLWithPath: "/Users/me")

@@ -39,6 +39,13 @@ struct HerdrClient: Sendable {
         let _: IgnoredResult = try await request("agent.focus", params: AgentTarget(target: target))
     }
 
+    /// The pane's foreground process group, or nil when it has none. While an agent waits for input,
+    /// that's the agent's own group. See "Background jobs" in `docs/PRD.md`.
+    func foregroundProcessGroup(ofPane paneId: String) async throws -> Int32? {
+        let result: PaneProcessInfoResult = try await request("pane.process_info", params: PaneTarget(paneId: paneId))
+        return result.processInfo.foregroundProcessGroupId
+    }
+
     func request<Result: Decodable>(_ method: String) async throws -> Result {
         try await request(method, params: EmptyParams())
     }
@@ -199,6 +206,21 @@ struct EmptyParams: Encodable {}
 
 private struct AgentTarget: Encodable {
     let target: String
+}
+
+private struct PaneTarget: Encodable {
+    let paneId: String
+}
+
+/// The `result` of a `pane.process_info` request. Only the fields this app uses are decoded.
+struct PaneProcessInfoResult: Decodable, Sendable {
+    struct ProcessInfo: Decodable, Sendable {
+        let paneId: String
+        let shellPid: Int32?
+        let foregroundProcessGroupId: Int32?
+    }
+
+    let processInfo: ProcessInfo
 }
 
 /// Accepts any `result`, for requests where only success or failure matters.

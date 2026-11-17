@@ -34,6 +34,22 @@ struct StatusMenuTests {
         }
     }
 
+    @Test func listsAnAgentsBackgroundJobsUnderItsRow() throws {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        var waiting = agent("w1:p1", .done, title: "Export data")
+        waiting.backgroundJobs = [BackgroundJob(pid: 10, command: "python3 export.py", startDate: now - 600)]
+        let items = StatusMenu.items(for: .loaded([waiting, agent("w1:p2", .idle)]), settings: settings, target: nil, now: now)
+
+        let rows = Array(items[2...3])
+        if #available(macOS 14.4, *) {
+            #expect(rows[0].subtitle == "In background: python3 export.py (10m)")
+            #expect(rows[1].subtitle == nil)
+        } else {
+            #expect(rows[0].toolTip == "In background: python3 export.py (10m)")
+        }
+        #expect(rows[0].title == "Export data — project", "The title stays as it was")
+    }
+
     @Test func inCountsModeRowsAreSortedByStateLikeTheCounts() {
         var countsSettings = settings
         countsSettings.style = .counts
