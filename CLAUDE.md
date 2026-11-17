@@ -37,7 +37,7 @@ The user's real agents run in the local herdr server, including the agent workin
 
 - Never run `herdr server stop`, call `server.stop` or `server.live_handoff`, or close panes, tabs or workspaces.
 - Never send keys, text or prompts to agents.
-- Read-only calls are fine: `ping`, `agent.list`, `agent.get`, `session.snapshot` and `events.subscribe`.
+- Read-only calls are fine: `ping`, `agent.list`, `agent.get`, `session.snapshot`, `events.subscribe`, `pane.process_info` and `agent.explain`.
 - `agent.focus` changes what the user sees in their terminal. Call it only during a manual test the user asked for.
 - To test "server not running", point the client at a socket path that doesn't exist. Don't stop the server.
 - The repo is public. Anything committed that came from herdr must be anonymized: no real paths, project names, terminal titles or session IDs.
