@@ -19,7 +19,19 @@ extension AgentStatus: Decodable {
     }
 }
 
-/// One agent from herdr's `agent.list`. Only the fields this app uses are decoded.
+/// The server an agent comes from.
+enum AgentSource: String, CaseIterable, Sendable {
+    case herdr
+    case rex
+
+    /// The server's name, as the menu's section headers show it.
+    var title: String { rawValue }
+}
+
+/// One agent from herdr's `agent.list`, or a rex terminal that reports a status (see `RexAgents`).
+/// Only the fields this app uses are decoded.
+///
+/// For a rex agent, `paneId` is the terminal's block ID, `workspaceId` its session ID and `tabId` its window ID.
 struct Agent: Decodable, Identifiable, Equatable, Sendable {
     let paneId: String
     let workspaceId: String
@@ -37,6 +49,10 @@ struct Agent: Decodable, Identifiable, Equatable, Sendable {
     /// Commands the agent left running in the background. Not from herdr: `AgentStore` finds them in the
     /// process tree, and only for `done` and `idle` agents. See "Background jobs" in `docs/PRD.md`.
     var backgroundJobs: [BackgroundJob] = []
+    /// Not from herdr's reply: rex agents set it.
+    var source: AgentSource = .herdr
+    /// What the agent says it's doing, such as "Running the test suite". Only rex reports one.
+    var message: String?
 
     private enum CodingKeys: String, CodingKey {
         case paneId, workspaceId, tabId, agent, name, agentStatus, focused, cwd, foregroundCwd, terminalTitleStripped

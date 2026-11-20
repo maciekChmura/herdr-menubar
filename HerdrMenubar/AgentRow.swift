@@ -12,6 +12,13 @@ struct AgentRow: Identifiable, Equatable {
         return "\(agent.displayTitle) — \(folder)"
     }
 
+    /// The lines under the row: what a rex agent says it's doing, then its background jobs.
+    /// Nil when there's neither. See "Dropdown" in `docs/PRD.md`.
+    func subtitle(now: Date) -> String? {
+        let lines = [agent.message, backgroundSummary(now: now)].compactMap { $0 }
+        return lines.isEmpty ? nil : lines.joined(separator: "\n")
+    }
+
     /// The agent's background jobs, such as "In background: npm test (12m)", or nil when it has none.
     /// Shown on a second line under the row. See "Background jobs" in `docs/PRD.md`.
     func backgroundSummary(now: Date) -> String? {

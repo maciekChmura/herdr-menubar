@@ -1,12 +1,24 @@
 import AppKit
 
-/// The terminal app that runs the herdr TUI. v1 assumes Ghostty.
-enum TerminalApp {
-    static let bundleIdentifier = "com.mitchellh.ghostty"
+/// The app that shows an agent's terminal.
+struct TerminalApp: Sendable {
+    let bundleIdentifier: String
 
-    /// Brings the terminal to the front. Does nothing if it isn't running, so it never opens a new terminal.
+    /// Runs the herdr TUI. v1 assumes Ghostty.
+    static let ghostty = TerminalApp(bundleIdentifier: "com.mitchellh.ghostty")
+    static let rex = TerminalApp(bundleIdentifier: "com.superlogical.rex")
+
+    /// The app that shows the agents of `source`.
+    static func showing(_ source: AgentSource) -> TerminalApp {
+        switch source {
+        case .herdr: .ghostty
+        case .rex: .rex
+        }
+    }
+
+    /// Brings the app to the front. Does nothing if it isn't running, so it never opens a new window.
     @MainActor
-    static func activate() {
+    func activate() {
         guard let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier).first,
               let url = app.bundleURL
         else { return }
@@ -17,9 +29,9 @@ enum TerminalApp {
         NSWorkspace.shared.openApplication(at: url, configuration: configuration)
     }
 
-    /// Whether the terminal is the frontmost app.
+    /// Whether the app is the frontmost app.
     @MainActor
-    static var isFrontmost: Bool {
+    var isFrontmost: Bool {
         NSWorkspace.shared.frontmostApplication?.bundleIdentifier == bundleIdentifier
     }
 }

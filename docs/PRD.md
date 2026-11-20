@@ -1,11 +1,11 @@
 # herdr-menubar: product requirements
 
-A native macOS menu bar app that shows the live state of the AI coding agents running in the local herdr server, and jumps to any of them in one click.
+A native macOS menu bar app that shows the live state of the AI coding agents running in the local herdr server and the local rex server, and jumps to any of them in one click.
 
 ## Goals
 
 - See at a glance how many agents are blocked, working, done and idle.
-- Update the moment an agent changes state, using herdr's event subscription instead of a polling loop.
+- Update the moment an agent changes state, using each server's events instead of a polling loop.
 - Focus any agent in the open herdr TUI with one click.
 - Get a macOS notification when an agent gets blocked or finishes.
 - See when an agent has finished its turn but left a command running in the background, such as a long test run, and will start working again when it ends.
@@ -13,15 +13,15 @@ A native macOS menu bar app that shows the live state of the AI coding agents ru
 ## Non-goals (v1)
 
 - Not a terminal: no embedded agent output, no sending prompts or keys to agents.
-- No remote machines: only the herdr server on this Mac, not machines saved in `herdr machine` or reached over SSH.
+- No remote machines: only the herdr and rex servers on this Mac, not machines saved in `herdr machine`, reached over SSH, or added as rex hosts.
 - No starting or stopping agents, and no managing workspaces, tabs or panes.
-- No changes to herdr's configuration, and no replacing herdr's own notifications.
+- No changes to herdr's or rex's configuration, and no replacing their own notifications.
 - No App Store, no sandboxing, and no installing updates: the app only says when a newer release is out (see "Update check").
 - No settings window. The only settings are in the menu: what the menu bar shows, "Animate dots", "Launch at login" and "Check for updates".
 
 ## User
 
-One person running herdr 0.9.x locally in Ghostty, with several Claude Code agents open at once.
+One person running herdr 0.9.x locally in Ghostty, with several Claude Code agents open at once. Since M11, also Rex (in beta), a terminal multiplexer, with Claude Code agents in its sessions. herdr and rex can run at the same time.
 
 ## herdr integration
 
@@ -43,6 +43,38 @@ The parts that shape the design:
 5. If the subscription connection drops (the server restarted, or `herdr update --handoff` ran), reconnect with backoff: 1 s, 2 s, 4 s and so on, capped at 30 s.
 
 If milestone M2 finds that `pane.updated` fires too often to be useful, drop it from the subscription and note this in `docs/herdr/README.md`.
+
+## rex integration
+
+[Rex](https://www.superlogical.com/rex) is a terminal multiplexer. Programs in its terminals report their own state with an escape sequence, OSC 7501, and Claude Code does this without any setup. Before writing client code, read `docs/rex/README.md`. It has the protocol as verified against the live server.
+
+The parts that shape the design:
+
+- The socket is `~/Library/Application Support/rex/server.sock`. The `RexSocketPath` setting replaces it, for example `-RexSocketPath /nonexistent/rex.sock` at launch.
+- One long-lived WebSocket connection to `/api/control` carries requests, responses and events, as JSON. The app speaks control API revision 18.
+- Apple's WebSocket clients can't open a Unix socket, so the app has a small WebSocket client of its own: text messages only, no compression.
+
+### Which terminals are agents
+
+Every terminal with a status record counts, whatever program reported it: Claude Code, Codex, or a long build that uses the protocol. Its state comes from its records:
+
+- A record that outlived its program doesn't count: an `idle`, `working` or `blocked` record whose owner isn't the terminal's foreground process any more. Rex keeps `idle` records after their program exits, so without this rule a terminal where Claude Code ran once would stay an agent. `done` and `error` records count until Rex removes them, because they're meant to be seen.
+- A program can report several records, for example one per worker. The most urgent state wins: `blocked`, then `working`, `done` and `idle`.
+- `error` (failed and stopped) is shown as `done`: the work is over and the user hasn't seen it yet. The row's message says what failed.
+- A state this app doesn't recognize counts as `idle`, as Rex's docs say.
+
+Each row shows the terminal's title, or the program's name when there's none; the folder of the terminal's foreground process; and, as a second line, the record's message, such as "Running the test suite".
+
+### Keeping rex state in sync
+
+1. Connect, send the hello, and call `session.attach_all` with `event_scope` set to `all`. `session` would leave out the terminals' events.
+2. Fetch: `session.list`, then `session.list_blocks` for each session, then `program_status` for each terminal block, and `process` and `title` for the blocks that have records.
+3. Fetch again, debounced by about 100 ms, on `program_status_changed`, `program_status_removed`, `process_changed`, `title_changed`, `child_exited`, `block_closed`, `session_created`, `session_destroyed` and `session_moved`. Ignore other events, in particular the client events that every `rex` command causes.
+4. Fetch every 30 seconds while connected, as a safety net, and reconnect with the same backoff as for herdr.
+
+### Limits
+
+- Rex can't say which session Rex.app is showing, so rex rows have no checkmark, and notifications for rex agents are always posted.
 
 ## States
 
@@ -71,8 +103,9 @@ The user picks one of two styles under "Menu bar shows" in the menu. The choice 
 
 In both styles:
 
+- The agents of both servers count: herdr's first, then rex's (added in M11).
 - With no agents, show the SF Symbol `circle.dashed`.
-- When the herdr server isn't reachable, show the SF Symbol `exclamationmark.circle`.
+- When neither server is reachable, show the SF Symbol `exclamationmark.circle`. One server that isn't running is normal: the user may use only the other.
 
 ## Animation
 
@@ -96,17 +129,17 @@ The animations are Core Animation animations that macOS plays outside the app, s
 An AppKit `NSMenu`, rebuilt each time it opens, and updated while it's open when the agents change.
 
 1. **Update** (added in M9): only when a newer release is out, "Update available: 0.2.0…" followed by a separator. See "Update check".
-2. **Header**: a disabled item with the agent count, such as "4 agents".
-3. **Agent rows**: one item per agent, in the same order as the menu bar. In dots mode that's herdr's order, so the 2nd dot is the 2nd row. In counts mode the rows are sorted by state in the order above, like the counts, then by folder name. Each row shows:
+2. **Header**: a disabled item with the agent count of both servers, such as "4 agents".
+3. **Agent rows**: one item per agent, in the same order as the menu bar. In dots mode that's the servers' order, so the 2nd dot is the 2nd row. In counts mode the rows are sorted by state in the order above, like the counts, then by folder name. When more than one server has something to show (agents, "Loading…" or an error), each gets a section header, "herdr" or "rex", and its rows are sorted within it (added in M11). A server that isn't running, or has no agents, is left out. Each row shows:
    - the state dot, as the item's icon, with the green ring when the agent has background jobs;
    - the title: `terminal_title_stripped`, or `agent` when the title is empty;
    - the folder: the last path component of `foreground_cwd`, falling back to `cwd`;
-   - the background jobs, if any (added in M10), as a second line such as "In background: npm test (12m)". The second line is the item's `subtitle`, which needs macOS 14.4; on older versions the text is the item's tooltip.
+   - for a rex agent, its message (added in M11), and the background jobs, if any (added in M10), such as "In background: npm test (12m)", on the lines below. They're the item's `subtitle`, which needs macOS 14.4; on older versions the text is the item's tooltip.
 
    Mark the agent whose `focused` is `true`, for example with a checkmark.
 4. **Footer**: the "Menu bar shows" choice (added in M7), an "Animate dots" toggle (added in M8), a "Launch at login" toggle (added in M6), a "Check for updates" toggle (added in M9) and "Quit".
 
-When the herdr server isn't reachable, replace the rows with one disabled item: "herdr server is not running". Add a second disabled line below it: "Start it by running `herdr`".
+When neither server is running, replace the rows with one disabled item: "Neither herdr nor rex is running". Add a second disabled line below it: "Start herdr, or open Rex". When a server is running but can't be read, its section says "Couldn't read agents from herdr" (or rex), with the error below.
 
 ## Clicking an agent
 
@@ -115,6 +148,13 @@ When the herdr server isn't reachable, replace the rows with one disabled item: 
 3. If the call fails, beep and log the error.
 
 Focusing an agent marks it as seen, so a `done` agent turns `idle`. This is expected.
+
+For a rex agent (added in M11):
+
+1. Call `session.focus_block` with the agent's session and block. This makes the block's window the active one in its session.
+2. Ask each Rex.app connected over the local socket to show the session: `client.perform` with the action `session.select`. Rex.app does this only when Remote Control is on in its settings. When it's off, the call fails; log it and go on.
+3. Bring Rex.app to the front (bundle ID `com.superlogical.rex`).
+4. If step 1 fails, beep and log the error.
 
 ## Notifications
 
@@ -131,7 +171,7 @@ Focusing an agent marks it as seen, so a `done` agent turns `idle`. This is expe
 An agent can start a long command in the background, such as a test run or a data export, end its turn and wait for it. herdr then reports the agent as `done` or `idle`, although the agent starts working again by itself when the command finishes. herdr can't see these commands: it reads the screen, and Claude Code only shows them as "· 2 shells" below its prompt. The app finds them in the process tree instead and marks the agent with a green ring. The agent's state stays as herdr reports it, so a `done` agent still notifies.
 
 - **Which agents**: only `done` and `idle` ones. A working agent's commands are part of its work, and a blocked agent is waiting for the user.
-- **Finding the jobs**: `pane.process_info` returns the pane's foreground process group. While the agent waits for input, that's the agent's own group. A background job is a process whose parent is in that group but which runs in a process group of its own. Claude Code starts every Bash command that way, while its MCP servers stay in its group. See `docs/herdr/README.md`.
+- **Finding the jobs**: for a herdr agent, `pane.process_info` returns the pane's foreground process group. For a rex agent (added in M11), it's the process group of the terminal's foreground process, which rex's `process` returns. While the agent waits for input, that's the agent's own group. A background job is a process whose parent is in that group but which runs in a process group of its own. Claude Code starts every Bash command that way, while its MCP servers stay in its group. See `docs/herdr/README.md`.
 - **At least 5 seconds old**: Claude Code's status line and hooks also run in process groups of their own, but for well under a second, so younger processes don't count. When one is skipped, check again once it would be 5 seconds old.
 - **The command shown**: the first process under the job's shell that isn't a shell itself, such as `sleep 240`, or `npm test` in `( time npm test )`, which runs in a subshell. Paths are shortened to their last component, and an interpreter that runs a script by its path is left out, so `node /opt/homebrew/bin/npm test` shows as `npm test`. When the shell hasn't started anything, its own name.
 - **When to check**: on every `agent.list` fetch. When a job ends, the agent wakes up and herdr's status event removes the ring. The 30-second safety fetch removes it if a job was stopped without waking the agent.
@@ -277,3 +317,17 @@ Done when:
 - The ring, the count and the row's second line are unit-tested.
 - A real agent that starts a command in the background and ends its turn gets the ring within a few seconds, and loses it when the command finishes.
 - `docs/herdr/README.md` records `pane.process_info` and what herdr reports while a background command runs.
+
+### M11: rex
+
+- [x] A WebSocket client on the Unix socket and a rex client that sends the hello, makes requests and receives events, as described in "rex integration".
+- [x] The terminals that count as agents and their state, as described in "Which terminals are agents", kept in sync as described in "Keeping rex state in sync".
+- [x] herdr and rex side by side: both servers' agents in the menu bar, section headers in the dropdown, and the "neither is running" state.
+- [x] Clicking a rex agent and its notifications, as described in "Clicking an agent", and background jobs for rex agents.
+
+Done when:
+- The WebSocket framing, the rex client and choosing the terminals and their state are unit-tested against a fake rex server, including records that outlived their program and events that don't cause a fetch.
+- The sections and the "neither is running" state are unit-tested.
+- A real Claude Code agent in Rex shows up in the menu bar, and its state changes within about one second.
+- Clicking a rex agent focuses its terminal and brings Rex.app to the front.
+- `docs/rex/README.md` records what Claude Code reports when its turn ends.

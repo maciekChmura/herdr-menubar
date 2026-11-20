@@ -7,6 +7,7 @@ import AppKit
 @MainActor
 final class StatusItemController: NSObject, NSMenuDelegate {
     private let store: AgentStore
+    private let rexStore: RexStore
     private let notifier = Notifier()
     private let launchAtLogin = LaunchAtLogin()
     private let animation = DotAnimationSettings()
@@ -24,6 +25,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     override init() {
         store = AgentStore(client: HerdrClient(socketPath: HerdrClient.resolveSocketPath()))
+        rexStore = RexStore(client: RexClient(socketPath: RexClient.resolveSocketPath()))
         super.init()
 
         statusItem.button?.addSubview(dotsView)
@@ -32,6 +34,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
         store.onAgentsChanged = { [weak self] _ in self?.refresh() }
         store.onAlerts = { [weak self] alerts in self?.post(alerts) }
+        rexStore.onAgentsChanged = { [weak self] _ in self?.refresh() }
+        rexStore.onAlerts = { [weak self] alerts in self?.post(alerts) }
         // Clicking a notification does the same as clicking the agent's row.
         notifier.onOpen = { [weak self] paneId in self?.focus(paneId: paneId) }
         animation.onChange = { [weak self] in self?.refresh() }
@@ -43,7 +47,13 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         notifier.requestAuthorization()
         refresh()
         store.start()
+        rexStore.start()
         updates.start()
+    }
+
+    /// What herdr and rex report. See "Menu bar label" and "Dropdown" in `docs/PRD.md`.
+    private var sources: AgentSources {
+        AgentSources(herdr: store.state, rex: rexStore.state)
     }
 
     // MARK: Menu bar item
@@ -56,14 +66,14 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private func updateStatusItem() {
         guard let button = statusItem.button else { return }
         let height = NSStatusBar.system.thickness
-        switch MenuBarLabel(store.state, style: style) {
+        switch MenuBarLabel(sources.combined, style: style) {
         case .symbol(let name):
             // When the dots come back, they start fresh rather than fading from what they showed before.
             dotsView.reset()
             dotsView.isHidden = true
             button.image = NSImage(systemSymbolName: name, accessibilityDescription: nil)
             statusItem.length = NSStatusItem.variableLength
-            button.setAccessibilityLabel(name == MenuBarLabel.unreachableSymbol ? "herdr is not running" : "No agents")
+            button.setAccessibilityLabel(name == MenuBarLabel.unreachableSymbol ? "Neither herdr nor rex is running" : "No agents")
         case .dots(let panes):
             show(.dots(panes), in: button, height: height)
             button.setAccessibilityLabel(MenuBarLabel.spokenSummary(
@@ -109,7 +119,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             checkForUpdatesOn: updates.isEnabled,
             update: updates.available
         )
-        menu.items = StatusMenu.items(for: store.state, settings: settings, target: self)
+        menu.items = StatusMenu.items(for: sources, settings: settings, target: self)
     }
 
     @objc func selectAgent(_ sender: NSMenuItem) {
@@ -145,11 +155,18 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     // MARK: Actions
 
-    /// Focuses the agent in herdr and brings the terminal to the front, or beeps if herdr refused.
+    /// Focuses the agent in its server and brings the app that shows it to the front, or beeps if the server
+    /// refused. See "Clicking an agent" in `docs/PRD.md`.
     private func focus(paneId: String) {
+        // An agent that's gone, such as from an old notification, is left to herdr to refuse, as before rex.
+        let source = sources.agent(withPaneId: paneId)?.source ?? .herdr
         Task {
-            if await store.focus(paneId: paneId) {
-                TerminalApp.activate()
+            let focused = switch source {
+            case .herdr: await store.focus(paneId: paneId)
+            case .rex: await rexStore.focus(paneId: paneId)
+            }
+            if focused {
+                TerminalApp.showing(source).activate()
             } else {
                 NSSound.beep()
             }
@@ -157,8 +174,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     }
 
     private func post(_ alerts: [AgentAlert]) {
-        let terminalIsFrontmost = TerminalApp.isFrontmost
-        for alert in alerts where alert.shouldPost(terminalIsFrontmost: terminalIsFrontmost) {
+        for alert in alerts where alert.shouldPost(terminalIsFrontmost: TerminalApp.showing(alert.agent.source).isFrontmost) {
             notifier.post(alert)
         }
     }
